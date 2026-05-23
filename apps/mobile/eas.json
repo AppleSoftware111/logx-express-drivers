@@ -1,0 +1,46 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "base": {
+      "node": "20.18.0"
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4000"
+      },
+      "prebuildCommand": "cd ../.. && npm install && cd apps/mobile && node scripts/generate-assets.mjs"
+    },
+    "preview-lan": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:4000"
+      }
+    },
+    "production": {
+      "extends": "base",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

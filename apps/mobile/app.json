@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "LOGX Express",
+    "slug": "logx-express-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1d4ed8"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.logxexpress.driver",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "LOGX Express needs location access to track your route and record stops.",
+        "NSLocationWhenInUseUsageDescription": "LOGX Express needs location access to show your position on the map.",
+        "NSCameraUsageDescription": "LOGX Express needs camera access to capture proof of delivery photos.",
+        "NSMicrophoneUsageDescription": "Camera access requires microphone permission."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1d4ed8"
+      },
+      "package": "com.logxexpress.driver",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "LOGX Express needs location access to track your route.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LOGX Express needs camera access to capture proof of delivery photos."
+        }
+      ]
+    ],
+    "scheme": "logxexpress",
+    "extra": {}
+  }
+}

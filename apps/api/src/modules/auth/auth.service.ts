@@ -1,0 +1,145 @@
+import bcrypt from 'bcryptjs';
+
+import { BCRYPT_ROUNDS } from '@logx/shared';
+
+import { AppError } from '../../middleware/errorHandler';
+import { User } from '../../models/User.model';
+import {
+  getRefreshTokenExpiry,
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from '../../utils/jwtHelpers';
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface LoginResult extends AuthTokens {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    companyId?: string;
+    driverId?: string;
+    clientId?: string;
+  };
+}
+
+export async function loginService(email: string, password: string): Promise<LoginResult> {
+  const user = await User.findOne({ email: email.toLowerCase() }).select(
+    '+passwordHash +refreshTokens'
+  );
+
+  if (!user || !user.isActive) {
+    throw new AppError('Invalid email or password', 401);
+  }
+
+  const isValid = await bcrypt.compare(password, user.passwordHash);
+  if (!isValid) {
+    throw new AppError('Invalid email or password', 401);
+  }
+
+  const tokenPayload = {
+    userId: user._id.toString(),
+    companyId: user.companyId?.toString() ?? '',
+    role: user.role,
+    driverId: user.driverId?.toString(),
+    clientId: user.clientId?.toString(),
+  };
+
+  const accessToken = signAccessToken(tokenPayload);
+  const refreshToken = signRefreshToken(tokenPayload);
+
+  // Prune expired tokens and append new one
+  const now = new Date();
+  const validTokens = user.refreshTokens.filter((t) => t.expiresAt > now);
+  validTokens.push({ token: refreshToken, expiresAt: getRefreshTokenExpiry() });
+
+  await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: validTokens } });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      companyId: user.companyId?.toString(),
+      driverId: user.driverId?.toString(),
+      clientId: user.clientId?.toString(),
+    },
+  };
+}
+
+export async function refreshTokenService(refreshToken: string): Promise<AuthTokens> {
+  const payload = verifyRefreshToken(refreshToken);
+  if (!payload) {
+    throw new AppError('Invalid or expired refresh token', 401);
+  }
+
+  const user = await User.findById(payload.userId).select('+refreshTokens');
+  if (!user || !user.isActive) {
+    throw new AppError('User not found or inactive', 401);
+  }
+
+  const now = new Date();
+  const tokenRecord = user.refreshTokens.find(
+    (t) => t.token === refreshToken && t.expiresAt > now
+  );
+
+  if (!tokenRecord) {
+    // Possible token reuse attack — invalidate all sessions
+    await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: [] } });
+    throw new AppError('Refresh token reuse detected. All sessions invalidated.', 401);
+  }
+
+  const newTokenPayload = {
+    userId: user._id.toString(),
+    companyId: user.companyId?.toString() ?? '',
+    role: user.role,
+    driverId: user.driverId?.toString(),
+    clientId: user.clientId?.toString(),
+  };
+
+  const newAccessToken = signAccessToken(newTokenPayload);
+  const newRefreshToken = signRefreshToken(newTokenPayload);
+
+  // Rotate: remove old, add new
+  const updatedTokens = user.refreshTokens
+    .filter((t) => t.token !== refreshToken && t.expiresAt > now)
+    .concat({ token: newRefreshToken, expiresAt: getRefreshTokenExpiry() });
+
+  await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: updatedTokens } });
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+}
+
+export async function logoutService(
+  userId: string,
+  refreshToken: string | undefined
+): Promise<void> {
+  if (!refreshToken) return;
+
+  await User.findByIdAndUpdate(userId, {
+    $pull: { refreshTokens: { token: refreshToken } },
+  });
+}
+
+export async function getMeService(userId: string) {
+  const user = await User.findById(userId)
+    .select('-passwordHash -refreshTokens')
+    .populate('companyId', 'name logo')
+    .lean();
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  return user;
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}

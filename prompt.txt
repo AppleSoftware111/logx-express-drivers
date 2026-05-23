@@ -1,0 +1,659 @@
+You are a senior full-stack engineer building LOGX EXPRESS, a professional healthcare logistics 
+platform for hospital and laboratory courier operations in Brazil. 
+
+This is a production-grade system. Write clean, scalable, well-structured code at every step.
+Never take shortcuts. Every module must be fully functional before moving to the next.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Frontend (Web):
+- Next.js 14 (App Router)
+- TypeScript (strict mode, no any)
+- Tailwind CSS + shadcn/ui
+- React Query (TanStack Query v5) for server state
+- Zustand for client state
+- React Hook Form + Zod for all forms
+- Socket.io-client for real-time
+- Google Maps JavaScript API (@vis.gl/react-google-maps)
+- Recharts for dashboards
+- date-fns for all date/time logic
+
+Backend (API):
+- Node.js + Express (TypeScript)
+- Prisma ORM + PostgreSQL
+- Socket.io for real-time GPS and notifications
+- Bull + Redis for job queues (recurring routes, alerts)
+- JWT + Refresh Token auth (HttpOnly cookies)
+- Zod for request validation
+- Multer + AWS S3 for file uploads (POD photos)
+- node-cron for daily route generation
+- Twilio / Z-API for WhatsApp notifications
+
+Mobile (Driver App):
+- React Native (Expo SDK 51, TypeScript)
+- expo-location (background GPS tracking)
+- expo-camera (photo capture)
+- expo-signature-canvas (digital signature)
+- React Navigation v6
+- Socket.io-client
+- React Query
+
+Database: PostgreSQL via Prisma
+Cache/Queue: Redis (Upstash or self-hosted)
+Storage: AWS S3 (or Cloudflare R2)
+Deployment: AWS EC2 + RDS + S3 (or Railway/Render for MVP)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH STACK — DATABASE UPDATE
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Database: MongoDB Atlas (cloud) or self-hosted MongoDB 7+
+ODM: Mongoose 8 (TypeScript-first)
+Remove: Prisma, PostgreSQL
+Keep everything else the same
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+MONGOOSE SCHEMAS
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All schemas go in /src/models/
+Every schema must have: timestamps: true, and strict: true
+
+Company.model.ts
+{
+  name: String (required),
+  cnpj: String (unique),
+  logo: String,
+  isActive: Boolean (default: true)
+}
+
+Branch.model.ts
+{
+  companyId: ObjectId ref Company (required),
+  name: String,
+  address: String,
+  location: { type: { type: String, default: 'Point' }, coordinates: [Number] }
+}
+Index: location 2dsphere
+
+User.model.ts
+{
+  companyId: ObjectId ref Company,
+  clientId: ObjectId ref Client (nullable — for portal users),
+  driverId: ObjectId ref Driver (nullable — for driver users),
+  email: String (unique, lowercase),
+  passwordHash: String,
+  role: enum ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'CLIENT', 'DRIVER'],
+  refreshTokens: [{ token: String, expiresAt: Date }],
+  isActive: Boolean (default: true)
+}
+
+Driver.model.ts
+{
+  companyId: ObjectId ref Company (required),
+  userId: ObjectId ref User,
+  name: String (required),
+  phone: String,
+  cpf: String,
+  licenseNumber: String,
+  vehicleId: ObjectId ref Vehicle,
+  isActive: Boolean (default: true),
+  isOnline: Boolean (default: false),
+  currentLocation: {
+    lat: Number,
+    lng: Number,
+    updatedAt: Date
+  }
+}
+
+Vehicle.model.ts
+{
+  companyId: ObjectId ref Company,
+  plate: String (unique),
+  model: String,
+  year: Number,
+  type: enum ['CAR', 'MOTORCYCLE', 'VAN', 'TRUCK']
+}
+
+Client.model.ts
+{
+  companyId: ObjectId ref Company (required),
+  name: String (required),
+  cnpj: String,
+  address: String,
+  location: { type: { type: String, default: 'Point' }, coordinates: [Number] }
+  type: enum ['HOSPITAL', 'LABORATORY', 'OTHER'],
+  userId: ObjectId ref User (portal login user),
+  isActive: Boolean (default: true)
+}
+Index: location 2dsphere
+
+Contract.model.ts
+{
+  companyId: ObjectId ref Company,
+  clientId: ObjectId ref Client,
+  startDate: Date,
+  endDate: Date,
+  slaMinutes: Number (default: 30),
+  isActive: Boolean (default: true)
+}
+
+Route.model.ts
+{
+  companyId: ObjectId ref Company (required),
+  contractId: ObjectId ref Contract,
+  name: String (required),
+  description: String,
+  recurrenceType: enum ['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'],
+  daysOfWeek: [Number] (0=Sunday ... 6=Saturday),
+  scheduledTime: String (format 'HH:mm', e.g. '08:45'),
+  isActive: Boolean (default: true),
+  isTemplate: Boolean (default: false),
+  defaultDriverId: ObjectId ref Driver,
+  stops: [
+    {
+      clientId: ObjectId ref Client,
+      order: Number,
+      address: String,
+      location: { lat: Number, lng: Number },
+      expectedDurationMinutes: Number,
+      type: enum ['PICKUP', 'DELIVERY', 'BOTH']
+    }
+  ]
+}
+Index: companyId + isActive + recurrenceType
+
+RouteExecution.model.ts
+{
+  companyId: ObjectId ref Company,
+  routeId: ObjectId ref Route,
+  scheduledDate: Date (date only, no time),
+  scheduledTime: String (copied from Route at generation time),
+  driverId: ObjectId ref Driver (actual driver),
+  originalDriverId: ObjectId ref Driver (always the default, never changes),
+  isSubstitution: Boolean (default: false),
+  status: enum ['PENDING','ASSIGNED','ACCEPTED','IN_PROGRESS','COMPLETED','CANCELLED'],
+  actualStartTime: Date,
+  actualEndTime: Date,
+  totalDurationMinutes: Number,
+  delayMinutes: Number (default: 0),
+  stops: [
+    {
+      routeStopIndex: Number (index in route.stops),
+      clientId: ObjectId ref Client,
+      order: Number,
+      address: String,
+      location: { lat: Number, lng: Number },
+      type: enum ['PICKUP', 'DELIVERY', 'BOTH'],
+      status: enum ['PENDING','ARRIVED','IN_PROGRESS','COMPLETED','SKIPPED'],
+      arrivedAt: Date,
+      startedAt: Date,
+      completedAt: Date,
+      waitingTimeMinutes: Number,
+      podPhoto: String (S3 URL),
+      podSignature: String (S3 URL),
+      receiverName: String,
+      deliveryNotes: String,
+      deliveryLocation: { lat: Number, lng: Number }
+    }
+  ]
+}
+Indexes:
+- companyId + scheduledDate
+- routeId + scheduledDate (unique — prevents duplicate generation)
+- driverId + scheduledDate
+- status
+
+GpsPoint.model.ts
+{
+  executionId: ObjectId ref RouteExecution,
+  driverId: ObjectId ref Driver,
+  companyId: ObjectId ref Company,
+  location: { type: { type: String, default: 'Point' }, coordinates: [Number] },
+  speed: Number,
+  heading: Number,
+  accuracy: Number,
+  recordedAt: Date (required)
+}
+Indexes:
+- location 2dsphere
+- executionId + recordedAt
+- TTL index: recordedAt, expireAfterSeconds: 7776000 (90 days auto-cleanup)
+
+Alert.model.ts
+{
+  companyId: ObjectId ref Company,
+  executionId: ObjectId ref RouteExecution,
+  type: enum ['DELAY_15','DELAY_30','DELAY_60','GEOFENCE','DRIVER_OFFLINE'],
+  message: String,
+  isRead: Boolean (default: false),
+  createdAt: Date
+}
+Index: companyId + isRead + createdAt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+BACKEND FOLDER STRUCTURE UPDATE
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/src
+  /models         ← all Mongoose schemas here (not /prisma)
+  /config
+    db.ts         ← mongoose.connect() with retry logic
+    redis.ts
+    s3.ts
+  /middleware
+  /modules        ← same as before
+  /jobs
+  /socket
+  /utils
+
+db.ts must:
+- Connect with retry (3 attempts, 5s delay)
+- Log connection success/failure
+- Handle disconnection and auto-reconnect
+- Use MONGODB_URI from .env
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+MONGODB-SPECIFIC RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Query rules:
+- Always filter by companyId first in every query (multi-tenant safety)
+- Use .lean() on all read-only queries for performance
+- Use .select() to never over-fetch fields
+- Use .populate() sparingly — only what the frontend actually needs
+- Use aggregation pipeline for reports, never load full collections
+
+Duplicate execution prevention (CRITICAL):
+  await RouteExecution.findOneAndUpdate(
+    { routeId, scheduledDate },
+    { $setOnInsert: { ...executionData } },
+    { upsert: true, new: true }
+  )
+  This is atomic — safe even if cron runs twice
+
+GPS bulk insert:
+  await GpsPoint.insertMany(bufferedPoints, { ordered: false })
+  Run every 30 seconds from in-memory buffer
+
+Geofencing query (find executions near a point):
+  await Client.findOne({
+    location: {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [lng, lat] },
+        $maxDistance: 100 // meters
+      }
+    }
+  })
+
+Waiting time calculation:
+  const waitingTimeMinutes = Math.round(
+    (completedAt.getTime() - arrivedAt.getTime()) / 60000
+  )
+  Save directly to ExecutionStop.waitingTimeMinutes — never recompute on frontend
+
+Reports aggregation example:
+  RouteExecution.aggregate([
+    { $match: { companyId, scheduledDate: { $gte: start, $lte: end } } },
+    { $unwind: '$stops' },
+    { $group: {
+        _id: '$driverId',
+        totalStops: { $sum: 1 },
+        avgWaitingTime: { $avg: '$stops.waitingTimeMinutes' },
+        completedStops: { $sum: { $cond: [{ $eq: ['$stops.status','COMPLETED'] }, 1, 0] } }
+    }}
+  ])
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+ENVIRONMENT VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/logx_express
+REDIS_URL=redis://...
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+AWS_BUCKET=...
+AWS_REGION=...
+GOOGLE_MAPS_API_KEY=...
+WHATSAPP_API_KEY=...
+
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+BACKEND ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Folder structure:
+/src
+  /config         → env, database, redis, s3, google maps
+  /middleware     → auth, roles, validate, rateLimiter, errorHandler
+  /modules
+    /auth         → login, refresh, logout, me
+    /companies    → CRUD, multi-tenant isolation
+    /drivers      → CRUD, online/offline toggle
+    /clients      → CRUD, portal user creation
+    /routes       → CRUD, recurrence logic, templates
+    /executions   → daily generation, status updates, substitution
+    /tracking     → GPS ingestion, real-time broadcast
+    /pod          → photo + signature upload to S3
+    /reports      → daily/weekly/monthly, export CSV/PDF
+    /alerts       → delay detection, push, WhatsApp
+    /dashboard    → aggregated stats for admin
+    /notifications → WhatsApp via Z-API or Twilio
+  /jobs
+    → dailyRouteGenerator.ts  (cron: runs at 00:01 every day)
+    → delayChecker.ts         (cron: runs every 5 min)
+    → gpsCleanup.ts           (cron: weekly cleanup of old points)
+  /socket
+    → gpsHandler.ts           (driver emits location every 5s)
+    → dashboardHandler.ts     (admin receives live updates)
+  /utils          → haversine distance, time calc, s3 upload, jwt helpers
+  /types          → shared TypeScript types
+
+Key backend rules:
+- Every route handler wrapped in asyncHandler (no try/catch repetition)
+- All DB queries go through Prisma — no raw SQL unless for reports
+- Multi-tenant isolation: EVERY query filters by companyId from JWT
+- GPS points stored in bulk every 30 seconds from a buffer
+- Waiting time = ExecutionStop.completedAt - ExecutionStop.arrivedAt (stored in DB, never computed on frontend)
+- Delay detection: compare RouteExecution.scheduledDate + Route.scheduledTime vs current time, update delayMinutes every 5 min via job
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+DAILY ROUTE GENERATION JOB
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every day at 00:01, the job must:
+1. Query all active Routes where today matches recurrenceType + daysOfWeek
+2. For each route, create a RouteExecution with:
+   - scheduledDate = today
+   - driverId = route.defaultDriverId
+   - originalDriverId = route.defaultDriverId
+   - status = PENDING
+   - stops = copy of route.stops into ExecutionStop records
+3. Never duplicate (check if execution already exists for that route + date)
+4. Send WhatsApp notification to default driver
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+REAL-TIME GPS FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Driver app:
+1. On route start → emit socket event "driver:location" every 5 seconds
+   payload: { driverId, executionId, lat, lng, speed, heading, accuracy }
+2. Backend socket handler:
+   - Buffer points in memory
+   - Every 30s → bulk insert GpsPoints to DB
+   - Broadcast to admin room: "admin:driver_location" 
+   - Update DriverLocation (latest position) in DB
+3. Admin dashboard receives live updates via socket, updates map markers
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+GEOFENCING (Arrival Detection)
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When driver GPS is within 100m of a RouteStop:
+- Automatically set ExecutionStop.arrivedAt = now
+- Push notification to driver: "You have arrived at [ClientName]"
+- Notify admin dashboard in real-time
+- Start waiting time clock
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+ADMIN WEB PANEL PAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build these pages fully with all data connected:
+
+1. /dashboard
+   - Live map (Google Maps) with all online drivers as markers
+   - Summary cards: active routes, delayed routes, online drivers, completed today
+   - Recent alerts list (real-time)
+   - Active routes table with status + delay badge
+
+2. /operations
+   - Full-screen live map
+   - Left panel: route list for today with status
+   - Click route → show driver path, stops, current position
+   - Color code: green (on time), yellow (15m late), orange (30m late), red (60m late)
+   - Delay badges with exact minutes
+
+3. /routes
+   - Route list with filters (active, template, by driver, by client)
+   - Create/edit route: name, stops (reorderable drag), schedule, recurrence, driver assignment
+   - Route template system
+   - Preview of next 7 days executions
+
+4. /executions
+   - Today's executions list
+   - Filter by date range, driver, status
+   - Click execution → full timeline, GPS replay, all stops, waiting times
+   - GPS replay: slider to replay path on map with timestamps
+
+5. /drivers
+   - Driver list, online/offline badge
+   - Create/edit driver with vehicle assignment
+   - Driver history (all executions)
+
+6. /clients
+   - Hospital/laboratory list
+   - Create/edit client, assign portal user
+   - Client delivery history
+   - Contract management per client
+
+7. /reports
+   - Date range filter
+   - Metrics: total deliveries, on-time %, avg waiting time, delays by driver/route/client
+   - Export CSV + PDF
+
+8. /alerts
+   - Notification center
+   - Mark as read, filter by type
+
+9. /settings
+   - Company settings, multi-branch, users & permissions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+CLIENT PORTAL PAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Separate Next.js layout (/portal/*)
+Client sees ONLY their own data (enforced in backend by clientId in JWT)
+
+/portal/dashboard
+- Today's deliveries status
+- Live map showing their assigned driver when route is active
+
+/portal/deliveries
+- Delivery history with filters
+- Click delivery → full timeline, waiting time, POD
+
+/portal/tracking
+- Live map with real-time driver location
+- Active route status and next stop ETA
+
+/portal/pod
+- Access POD: photo, signature, receiver name, timestamp, GPS coords
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+DRIVER MOBILE APP SCREENS
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All built in React Native (Expo):
+
+1. Login screen
+2. Today's routes list (all executions assigned to me today)
+3. Route detail: stops list, scheduled time, client info
+4. Start Route button → requests background GPS permission
+5. Stop detail screen: 
+   - Navigate button (opens Google Maps)
+   - Arrived button → sets arrivedAt, starts waiting timer
+   - Start Pickup button → sets startedAt
+   - Complete Pickup button → sets completedAt, calculates waiting time
+   - Opens POD screen
+6. POD capture screen:
+   - Take photo (expo-camera)
+   - Capture signature (expo-signature-canvas)
+   - Enter receiver name + notes
+   - Submit → upload to S3 → mark stop COMPLETED
+7. Route completion screen
+8. GPS runs in background the entire time route is active (expo-location TaskManager)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+WAITING TIME LOGIC
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is critical. Implement exactly as follows:
+
+When driver taps "Arrived" at a stop:
+→ ExecutionStop.arrivedAt = new Date()
+
+When driver taps "Start Pickup":
+→ ExecutionStop.startedAt = new Date()
+
+When driver taps "Complete Pickup":
+→ ExecutionStop.completedAt = new Date()
+→ waitingTimeMinutes = Math.round((completedAt - arrivedAt) / 60000)
+→ Save to DB immediately
+
+Display in timeline:
+"Driver arrived at 09:00 AM — Pickup completed at 09:30 AM — Waiting time: 30 minutes"
+
+This must appear in:
+- Execution timeline (admin + client portal)
+- Operational reports
+- Per-stop history
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+DELAY ALERT SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every 5 minutes, a cron job checks all active (IN_PROGRESS or PENDING) RouteExecutions:
+
+1. Compute expected start = scheduledDate + scheduledTime
+2. If status is still PENDING and current time > expected start:
+   - delayMinutes = diff in minutes
+   - If delayMinutes >= 15 and no DELAY_15 alert exists → create Alert + emit socket + WhatsApp
+   - Same for 30 and 60 minutes
+3. Admin dashboard receives real-time alert via socket
+4. Badge on route row: "15m late", "30m late", "1h late" with color codes
+5. Alert center stores all alerts with timestamp
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+TEMPORARY DRIVER SUBSTITUTION
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When admin substitutes driver for an execution:
+- RouteExecution.driverId = newDriverId (actual driver today)
+- RouteExecution.originalDriverId stays unchanged (always the default)
+- RouteExecution.isSubstitution = true
+- All GPS, POD, waiting times recorded under the execution (not tied to driver permanently)
+- History always shows who was the default and who actually ran the route
+- Original route is NEVER modified or recreated
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+MULTI-TENANT RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Every authenticated request extracts companyId from JWT
+- Every Prisma query includes { where: { companyId } }
+- No cross-company data leakage ever
+- SUPER_ADMIN role can access all companies
+- All other roles scoped to their company only
+- Client portal users scoped to clientId, not just companyId
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- JWT access token: 15 min expiry
+- Refresh token: 7 days, stored in DB + HttpOnly cookie
+- Bcrypt password hashing (rounds: 12)
+- Helmet.js on all Express routes
+- CORS restricted to known origins
+- Rate limiting on auth endpoints (express-rate-limit)
+- All file uploads validated (type + size) before S3
+- Zod validation on every request body
+- SQL injection impossible via Prisma (parameterized queries)
+- S3 files served via presigned URLs (never public bucket)
+- Environment variables validated at startup (zod .env schema)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+GPS REPLAY SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+On /executions/[id] page:
+1. Fetch all GpsPoints for the execution ordered by recordedAt
+2. Render a Google Maps Polyline showing full path
+3. Replay controls: play, pause, speed (1x, 2x, 5x)
+4. Scrubber shows current timestamp
+5. Animated marker moves along the path
+6. Each stop marked with color (completed = green, skipped = gray, pending = white)
+7. Click stop marker → shows waiting time, POD photo thumbnail
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+DEVELOPMENT ORDER — FOLLOW THIS EXACTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 1 (Week 1 — Core):
+1. Set up monorepo: /apps/web, /apps/api, /apps/mobile, /packages/shared
+2. Prisma schema + migrations + seed data
+3. Auth module (JWT, refresh, roles)
+4. Companies, drivers, clients, vehicles CRUD
+5. Route creation with recurrence + stops
+6. Daily route generation cron job
+7. Socket.io server setup
+8. GPS ingestion endpoint + real-time broadcast
+9. Admin dashboard live map
+10. Driver app: login + today's routes + GPS background tracking
+
+Phase 2 (Week 2 — POD + Client Portal):
+11. Stop workflow: arrived → start → complete
+12. Waiting time calculation + storage
+13. POD upload: photo + signature → S3
+14. Execution timeline API
+15. Client portal layout + auth
+16. Client portal: dashboard + live tracking + delivery history + POD viewer
+
+Phase 3 (Week 3 — Ops Dashboard + Alerts):
+17. Delay detection cron + alert creation
+18. Real-time alert broadcast to admin
+19. Delay badges on dashboard
+20. GPS replay system
+21. Reports module (daily/weekly/monthly) + CSV export
+22. Temporary driver substitution API + UI
+23. WhatsApp notifications (Twilio or Z-API)
+24. Geofencing (auto-arrive detection)
+
+Phase 4 (Week 4 — Polish + Deploy):
+25. Multi-company UI (company switcher for SUPER_ADMIN)
+26. Full admin settings page
+27. Performance: DB indexes, query optimization, Redis caching
+28. AWS deployment: EC2 + RDS + S3 + Redis
+29. SSL + domain + NGINX reverse proxy
+30. Final tests, error boundaries, loading states, empty states everywhere
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+CODE QUALITY RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- TypeScript strict mode, no `any` anywhere
+- All async functions have proper error handling
+- All API responses follow { success, data, error, meta } structure
+- Loading, error, and empty states on EVERY UI component
+- Mobile app handles offline gracefully (queue GPS points locally)
+- All dates stored as UTC in DB, converted to local time on display
+- All monetary/time values stored as integers (minutes, not strings)
+- Google Maps API key restricted by domain/IP
+- No secrets in code — all in .env validated at startup
+- ESLint + Prettier configured across all apps
+- Git commits follow conventional commits spec
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+START COMMAND
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Start with Phase 1, Step 1.
+Set up the monorepo structure, then Prisma schema, then auth.
+Ask me before moving to each new phase.
+Show me the file/folder structure before writing any code.
