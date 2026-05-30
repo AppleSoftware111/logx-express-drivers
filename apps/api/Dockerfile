@@ -29,12 +29,17 @@ COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
 COPY packages/i18n/package*.json ./packages/i18n/
 COPY packages/shared/package*.json ./packages/shared/
+COPY packages/tsconfig ./packages/tsconfig/
+
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/i18n/dist ./packages/i18n/dist
+
+# ✅ Copy locale JSON files (not compiled by tsc)
+COPY --from=builder /app/packages/i18n/locales ./packages/i18n/locales
 
 RUN npm ci --omit=dev --workspace=@logx/shared --workspace=@logx/i18n --workspace=@logx/api
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/packages/i18n/dist ./packages/i18n/dist
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 EXPOSE 4000
 
