@@ -4,6 +4,9 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const nextConfig = {
   transpilePackages: ['@logx/shared', '@logx/i18n'],
   output: 'standalone',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       {

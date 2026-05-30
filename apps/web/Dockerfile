@@ -14,7 +14,7 @@ COPY packages/i18n/package*.json ./packages/i18n/
 COPY packages/shared/package*.json ./packages/shared/
 COPY packages/tsconfig ./packages/tsconfig/
 
-RUN npm ci --workspace=@logx/shared --workspace=@logx/i18n --workspace=@logx/web
+RUN npm ci --install-strategy=nested --workspace=@logx/shared --workspace=@logx/i18n --workspace=@logx/web
 
 COPY packages/i18n ./packages/i18n
 COPY packages/shared ./packages/shared
