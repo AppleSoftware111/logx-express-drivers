@@ -24,6 +24,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV CACHE_BUST=2
 
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
@@ -34,7 +35,7 @@ COPY packages/tsconfig ./packages/tsconfig/
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/i18n/dist ./packages/i18n/dist
 
-# ✅ Copy locale JSON files (not compiled by tsc)
+# ✅ Copy source locales (referenced as ../locales/ relative to dist/)
 COPY --from=builder /app/packages/i18n/locales ./packages/i18n/locales
 
 RUN npm ci --omit=dev --workspace=@logx/shared --workspace=@logx/i18n --workspace=@logx/api
