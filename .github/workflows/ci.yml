@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prebuild shared dependencies for lint resolution
+        run: npx turbo run build --filter=@logx/shared --filter=@logx/i18n
+
       - name: Lint
         run: npx turbo run lint --filter=@logx/api... --filter=@logx/web...
 
