@@ -27,7 +27,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --workspace=@logx/api --workspace=@logx/web --workspace=@logx/shared --workspace=@logx/i18n --include-workspace-root
 
       - name: Prebuild shared dependencies for lint resolution
         run: npx turbo run build --filter=@logx/shared --filter=@logx/i18n
