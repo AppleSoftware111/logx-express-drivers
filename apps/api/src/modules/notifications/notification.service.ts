@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { DEFAULT_LOCALE, getNestedMessage, type SupportedLocale } from '@logx/i18n';
+
 import { env } from '../../config/env';
 
 async function sendViaZApi(phone: string, message: string): Promise<void> {
@@ -52,10 +54,34 @@ export async function sendWhatsApp(phone: string, message: string): Promise<void
   }
 }
 
-export function buildRouteAssignedMessage(driverName: string, routeName: string, time: string): string {
-  return `Olá ${driverName}! Você tem uma rota atribuída hoje: *${routeName}* com saída às *${time}*. Acesse o app para ver os detalhes. - LOGX Express`;
+function formatTemplate(
+  locale: SupportedLocale,
+  key: string,
+  params: Record<string, string | number>
+): string {
+  const template =
+    getNestedMessage(locale, 'notifications', key) ??
+    getNestedMessage(DEFAULT_LOCALE, 'notifications', key) ??
+    '';
+  return Object.entries(params).reduce(
+    (msg, [k, v]) => msg.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
+    template
+  );
 }
 
-export function buildDelayAlertMessage(routeName: string, delayMinutes: number): string {
-  return `⚠️ ALERTA: A rota *${routeName}* está com *${delayMinutes} minutos* de atraso. - LOGX Express`;
+export function buildRouteAssignedMessage(
+  driverName: string,
+  routeName: string,
+  time: string,
+  locale: SupportedLocale = DEFAULT_LOCALE
+): string {
+  return formatTemplate(locale, 'routeAssigned', { driverName, routeName, time });
+}
+
+export function buildDelayAlertMessage(
+  routeName: string,
+  delayMinutes: number,
+  locale: SupportedLocale = DEFAULT_LOCALE
+): string {
+  return formatTemplate(locale, 'delayWhatsApp', { routeName, minutes: delayMinutes });
 }

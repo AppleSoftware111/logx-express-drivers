@@ -1,19 +1,19 @@
 import { z } from 'zod';
 
 export const createCompanySchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  name: z.string().min(2, 'validation.nameMin'),
   cnpj: z
     .string()
-    .regex(/^\d{14}$/, 'CNPJ must be 14 digits (numbers only)')
+    .regex(/^\d{14}$/, 'validation.cnpjDigits')
     .optional(),
-  logo: z.string().url('Logo must be a valid URL').optional(),
+  logo: z.string().url('validation.custom').optional(),
 });
 
 export const updateCompanySchema = createCompanySchema.partial();
 
 export const createBranchSchema = z.object({
-  name: z.string().min(2),
-  address: z.string().min(5),
+  name: z.string().min(2, 'validation.nameMin'),
+  address: z.string().min(5, 'validation.addressMin'),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
 });
@@ -21,12 +21,12 @@ export const createBranchSchema = z.object({
 export const updateBranchSchema = createBranchSchema.partial();
 
 export const createUserSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email('validation.invalidEmail'),
   password: z
     .string()
-    .min(8)
-    .regex(/[A-Z]/, 'Must contain uppercase')
-    .regex(/[0-9]/, 'Must contain number'),
+    .min(8, 'validation.passwordMin')
+    .regex(/[A-Z]/, 'validation.passwordUppercase')
+    .regex(/[0-9]/, 'validation.passwordNumber'),
   role: z.enum(['ADMIN', 'OPERATOR', 'CLIENT', 'DRIVER']),
   driverId: z.string().optional(),
   clientId: z.string().optional(),

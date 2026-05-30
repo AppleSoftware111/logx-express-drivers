@@ -1,3 +1,4 @@
+import { ApiErrorCode } from '@logx/i18n';
 import rateLimit from 'express-rate-limit';
 
 export const authLimiter = rateLimit({
@@ -7,7 +8,10 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    error: 'Too many requests, please try again after 15 minutes',
+    error: {
+      code: ApiErrorCode.RATE_LIMITED,
+      message: 'Too many requests, please try again after 15 minutes',
+    },
   },
 });
 
@@ -18,7 +22,10 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    error: 'Rate limit exceeded, please slow down',
+    error: {
+      code: ApiErrorCode.RATE_LIMITED,
+      message: 'Rate limit exceeded, please slow down',
+    },
   },
 });
 
@@ -29,6 +36,9 @@ export const uploadLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    error: 'Too many upload requests',
+    error: {
+      code: ApiErrorCode.RATE_LIMITED,
+      message: 'Too many upload requests',
+    },
   },
 });

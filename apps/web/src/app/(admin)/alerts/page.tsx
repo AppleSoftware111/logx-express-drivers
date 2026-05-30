@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
@@ -25,6 +26,7 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function AlertsPage() {
+  const t = useTranslations('alerts');
   const { data, isLoading } = useQuery({
     queryKey: ['alerts'],
     queryFn: async () => {
@@ -54,7 +56,7 @@ export default function AlertsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Alerts</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">
             {unread > 0 ? `${unread} unread alert${unread > 1 ? 's' : ''}` : 'All caught up'}
           </p>

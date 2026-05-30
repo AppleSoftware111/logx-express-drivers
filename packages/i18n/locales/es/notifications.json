@@ -1,0 +1,6 @@
+{
+  "delayWhatsApp": "La ruta {routeName} tiene un retraso de {minutes} minutos.",
+  "geofenceArrival": "El conductor llegó a la parada {stopName}.",
+  "routeAssigned": "Olá {driverName}! Você tem uma rota atribuída hoje: *{routeName}* com saída às *{time}*. Acesse o app para ver os detalhes. - LOGX Express",
+  "geofenceDriverArrival": "Você chegou em {stopName}"
+}

@@ -1,5 +1,7 @@
 import type { CreateContractInput, UpdateContractInput } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Contract } from '../../models/Contract.model';
 
@@ -19,7 +21,7 @@ export async function getContract(companyId: string, contractId: string) {
     .select('-__v')
     .populate('clientId', 'name type address')
     .lean();
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError(ApiErrorCode.CONTRACT_NOT_FOUND, 404);
   return contract;
 }
 
@@ -28,7 +30,7 @@ export async function createContract(companyId: string, data: CreateContractInpu
   const end = new Date(data.endDate);
 
   if (end <= start) {
-    throw new AppError('End date must be after start date', 400);
+    throw new AppError(ApiErrorCode.CONTRACT_END_BEFORE_START, 400);
   }
 
   const contract = await Contract.create({
@@ -57,7 +59,7 @@ export async function updateContract(
     { $set: update },
     { new: true }
   ).lean();
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError(ApiErrorCode.CONTRACT_NOT_FOUND, 404);
   return contract;
 }
 
@@ -67,6 +69,6 @@ export async function deactivateContract(companyId: string, contractId: string) 
     { isActive: false },
     { new: true }
   ).lean();
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError(ApiErrorCode.CONTRACT_NOT_FOUND, 404);
   return contract;
 }

@@ -1,0 +1,12 @@
+{
+  "title": "Informes",
+  "subtitle": "Métricas y exportación",
+  "startDate": "Fecha inicial",
+  "endDate": "Fecha final",
+  "generate": "Generar",
+  "exportCsv": "Exportar CSV",
+  "exportPdf": "Exportar PDF",
+  "totalDeliveries": "Total de entregas",
+  "avgWaitTime": "Tiempo medio de espera",
+  "onTimeRate": "Tasa a tiempo"
+}

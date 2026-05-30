@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Power, Truck, Users } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import type { CreateDriverInput, UpdateDriverInput } from '@logx/shared';
 
@@ -32,6 +33,8 @@ interface Vehicle {
 }
 
 export default function DriversPage() {
+  const t = useTranslations('drivers');
+  const tCommon = useTranslations('common');
   const sessionReady = useHasAccessToken();
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -128,8 +131,8 @@ export default function DriversPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Drivers</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage drivers and their status</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('subtitle')}</p>
         </div>
         <button
           type="button"
@@ -137,7 +140,7 @@ export default function DriversPage() {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Add Driver
+          {t('addDriver')}
         </button>
       </div>
 
@@ -149,10 +152,10 @@ export default function DriversPage() {
             onChange={(e) => setOnlineOnly(e.target.checked)}
             className="rounded"
           />
-          Online drivers only
+          {t('onlineOnly')}
         </label>
         <span className="text-sm text-gray-400">
-          {drivers?.length ?? 0} driver{drivers?.length !== 1 ? 's' : ''}
+          {t('driverCount', { count: drivers?.length ?? 0 })}
         </span>
       </div>
 
@@ -165,8 +168,8 @@ export default function DriversPage() {
       {!isLoading && drivers?.length === 0 && (
         <EmptyState
           Icon={Users}
-          title="No drivers yet"
-          description="Add your first driver to assign routes and track deliveries."
+          title={t('noDriversYet')}
+          description={t('noDriversDesc')}
           action={
             <button
               type="button"
@@ -200,7 +203,7 @@ export default function DriversPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{driver.name}</p>
-                  <p className="text-xs text-gray-400">{driver.phone ?? 'No phone'}</p>
+                  <p className="text-xs text-gray-400">{driver.phone ?? t('noPhone')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -208,7 +211,7 @@ export default function DriversPage() {
                   type="button"
                   onClick={() => openEdit(driver)}
                   className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                  title="Edit driver"
+                  title={t('editTitle')}
                 >
                   <Pencil className="w-4 h-4" />
                 </button>
@@ -223,7 +226,7 @@ export default function DriversPage() {
                       ? 'bg-green-50 text-green-600 hover:bg-green-100'
                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                   }`}
-                  title={driver.isOnline ? 'Set offline' : 'Set online'}
+                  title={driver.isOnline ? t('setOffline') : t('setOnline')}
                 >
                   <Power className="w-4 h-4" />
                 </button>
@@ -231,7 +234,9 @@ export default function DriversPage() {
             </div>
 
             {driver.licenseNumber && (
-              <p className="mt-2 text-xs text-gray-500">License: {driver.licenseNumber}</p>
+              <p className="mt-2 text-xs text-gray-500">
+                {t('license')}: {driver.licenseNumber}
+              </p>
             )}
 
             {driver.vehicleId && (
@@ -243,7 +248,7 @@ export default function DriversPage() {
 
             {driver.isOnline && driver.currentLocation && (
               <div className="mt-2 text-xs text-green-600">
-                Last seen:{' '}
+                {t('lastSeen')}:{' '}
                 {new Date(driver.currentLocation.updatedAt).toLocaleTimeString('pt-BR')}
               </div>
             )}

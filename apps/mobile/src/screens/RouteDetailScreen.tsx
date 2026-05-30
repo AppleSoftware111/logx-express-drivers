@@ -9,8 +9,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+
+import { getStopStatusLabel } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
+import { useLocaleStore } from '../stores/localeStore';
 import { useGpsTracking } from '../hooks/useGpsTracking';
 import { StopDetailScreen } from './StopDetailScreen';
 import { PODCaptureScreen } from './PODCaptureScreen';
@@ -37,6 +41,8 @@ interface Props {
 type View = 'route' | 'stop' | 'pod';
 
 export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
+  const { t } = useTranslation();
+  const { locale } = useLocaleStore();
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('route');
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
@@ -132,7 +138,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     <View style={{ flex: 1 }}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>← {t('mobile.back')}</Text>
         </TouchableOpacity>
         <Text style={styles.routeName}>{execution?.routeId?.name}</Text>
         <Text style={styles.scheduleTime}>{execution?.scheduledTime}</Text>
@@ -140,7 +146,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         {isTracking && (
           <View style={styles.liveIndicator}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>GPS Tracking Active</Text>
+            <Text style={styles.liveText}>{t('mobile.gpsActive')}</Text>
           </View>
         )}
       </View>
@@ -177,7 +183,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
                 <Text style={styles.waitingTime}>⏱ {stop.waitingTimeMinutes} min</Text>
               )}
             </View>
-            <Text style={styles.stopStatus}>{stop.status}</Text>
+            <Text style={styles.stopStatus}>{getStopStatusLabel(stop.status, locale)}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -192,7 +198,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
             {startRoute.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.startBtnText}>▶ Start Route</Text>
+              <Text style={styles.startBtnText}>▶ {t('mobile.startRoute')}</Text>
             )}
           </TouchableOpacity>
         ) : allCompleted && execution?.status === 'IN_PROGRESS' ? (
@@ -204,7 +210,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
             {completeRoute.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.startBtnText}>✅ Complete Route</Text>
+              <Text style={styles.startBtnText}>✅ {t('mobile.completeRoute')}</Text>
             )}
           </TouchableOpacity>
         ) : null}

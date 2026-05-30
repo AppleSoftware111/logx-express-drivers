@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +11,7 @@ import { apiClient } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
 
 function PODContent() {
+  const t = useTranslations('portal');
   const searchParams = useSearchParams();
   const executionId = searchParams.get('executionId');
 
@@ -45,7 +48,7 @@ function PODContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Proof of Delivery</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('podTitle')}</h1>
         <p className="text-sm text-gray-500 mt-1">
           {execution?.routeId?.name} ·{' '}
           {execution?.scheduledDate

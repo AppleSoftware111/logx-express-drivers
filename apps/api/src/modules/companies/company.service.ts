@@ -1,5 +1,7 @@
 import type { CreateCompanyInput, UpdateCompanyInput } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Company } from '../../models/Company.model';
 
@@ -14,14 +16,14 @@ export async function listCompanies(page: number, limit: number) {
 
 export async function getCompany(companyId: string) {
   const company = await Company.findById(companyId).select('-__v').lean();
-  if (!company) throw new AppError('Company not found', 404);
+  if (!company) throw new AppError(ApiErrorCode.COMPANY_NOT_FOUND, 404);
   return company;
 }
 
 export async function createCompany(data: CreateCompanyInput) {
   if (data.cnpj) {
     const existing = await Company.findOne({ cnpj: data.cnpj }).lean();
-    if (existing) throw new AppError('A company with this CNPJ already exists', 409);
+    if (existing) throw new AppError(ApiErrorCode.CNPJ_ALREADY_EXISTS, 409);
   }
 
   const company = await Company.create(data);
@@ -31,11 +33,11 @@ export async function createCompany(data: CreateCompanyInput) {
 export async function updateCompany(companyId: string, data: UpdateCompanyInput) {
   if (data.cnpj) {
     const existing = await Company.findOne({ cnpj: data.cnpj, _id: { $ne: companyId } }).lean();
-    if (existing) throw new AppError('CNPJ already in use', 409);
+    if (existing) throw new AppError(ApiErrorCode.CNPJ_ALREADY_EXISTS, 409);
   }
 
   const company = await Company.findByIdAndUpdate(companyId, data, { new: true }).lean();
-  if (!company) throw new AppError('Company not found', 404);
+  if (!company) throw new AppError(ApiErrorCode.COMPANY_NOT_FOUND, 404);
   return company;
 }
 
@@ -45,6 +47,6 @@ export async function deactivateCompany(companyId: string) {
     { isActive: false },
     { new: true }
   ).lean();
-  if (!company) throw new AppError('Company not found', 404);
+  if (!company) throw new AppError(ApiErrorCode.COMPANY_NOT_FOUND, 404);
   return company;
 }

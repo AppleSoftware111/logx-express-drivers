@@ -1,0 +1,19 @@
+{
+  "title": "Live dashboard",
+  "subtitle": "Real-time operations overview",
+  "activeDrivers": "Active drivers",
+  "routesToday": "Routes today",
+  "delayedRoutes": "Delayed routes",
+  "completedToday": "Completed today",
+  "liveMap": "Live map",
+  "noDriversOnline": "No drivers online",
+  "legend": "Legend",
+  "onRoute": "On route",
+  "idle": "Idle",
+  "delayed": "Delayed",
+  "unreadAlerts": "Alertas não lidos",
+  "liveDriverLocations": "Localização dos motoristas",
+  "recentAlerts": "Alertas recentes",
+  "activeExecutions": "Execuções ativas",
+  "noActiveExecutions": "Nenhuma execução ativa no momento"
+}

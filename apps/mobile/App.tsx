@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
+import { I18nextProvider } from 'react-i18next';
 
+import { initI18n, i18n } from './src/i18n';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { TodayRoutesScreen } from './src/screens/TodayRoutesScreen';
 import { RouteDetailScreen } from './src/screens/RouteDetailScreen';
 import { RouteCompleteScreen } from './src/screens/RouteCompleteScreen';
 import { useAuthStore } from './src/stores/authStore';
+import { useLocaleStore } from './src/stores/localeStore';
 import { apiClient } from './src/services/api';
 
 const queryClient = new QueryClient({
@@ -41,10 +44,12 @@ function AppContent() {
   const [completionCtx, setCompletionCtx] = useState<CompletionContext | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
 
-  // Bootstrap: check stored token
   useEffect(() => {
     const bootstrap = async () => {
       try {
+        const locale = await initI18n();
+        useLocaleStore.setState({ locale });
+
         const token = await SecureStore.getItemAsync('accessToken');
         if (token) {
           const res = await apiClient.get('/auth/me');
@@ -132,9 +137,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar style="light" />
-      <AppContent />
-    </QueryClientProvider>
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style="light" />
+        <AppContent />
+      </QueryClientProvider>
+    </I18nextProvider>
   );
 }

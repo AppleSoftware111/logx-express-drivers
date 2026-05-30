@@ -3,6 +3,8 @@ import type { Request, Response } from 'express';
 
 import { authenticate } from '../../middleware/auth';
 import { asyncHandler } from '../../middleware/asyncHandler';
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { uploadLimiter } from '../../middleware/rateLimiter';
 import { sendSuccess } from '../../utils/apiResponse';
@@ -27,7 +29,7 @@ router.post(
     const signatureFile = files?.signature?.[0];
 
     if (!photoFile && !signatureFile) {
-      throw new AppError('At least one file (photo or signature) is required', 400);
+      throw new AppError(ApiErrorCode.POD_FILE_REQUIRED, 400);
     }
 
     let photoKey: string | undefined;
@@ -65,7 +67,7 @@ router.get(
   '/presigned',
   asyncHandler(async (req: Request, res: Response) => {
     const key = req.query.key as string;
-    if (!key) throw new AppError('key query parameter is required', 400);
+    if (!key) throw new AppError(ApiErrorCode.POD_KEY_REQUIRED, 400);
 
     const url = await getPresignedUrl(key);
     return sendSuccess(res, { url });

@@ -5,6 +5,8 @@ import type {
   UpdateStopStatusInput,
 } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Alert } from '../../models/Alert.model';
 import { GpsPoint } from '../../models/GpsPoint.model';
@@ -84,7 +86,7 @@ export async function getExecution(companyId: string, executionId: string) {
     .populate('originalDriverId', 'name')
     .populate('stops.clientId', 'name address location type')
     .lean();
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
   return execution;
 }
 
@@ -94,7 +96,7 @@ export async function updateExecutionStatus(
   data: UpdateExecutionStatusInput
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const update: Record<string, unknown> = { status: data.status };
 
@@ -130,10 +132,10 @@ export async function substituteDriver(
   data: SubstituteDriverInput
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   if (['COMPLETED', 'CANCELLED'].includes(execution.status)) {
-    throw new AppError('Cannot substitute driver on a completed or cancelled execution', 400);
+    throw new AppError(ApiErrorCode.EXECUTION_CANNOT_SUBSTITUTE, 400);
   }
 
   const updated = await RouteExecution.findByIdAndUpdate(
@@ -162,13 +164,13 @@ export async function setStopArrived(
   stopId: string
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const stop = execution.stops.id(stopId);
-  if (!stop) throw new AppError('Stop not found', 404);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
 
   if (stop.status !== 'PENDING') {
-    throw new AppError(`Stop is already in status: ${stop.status}`, 400);
+    throw new AppError(ApiErrorCode.STOP_ALREADY_STATUS, 400, { status: stop.status });
   }
 
   stop.status = 'ARRIVED';
@@ -184,13 +186,13 @@ export async function setStopInProgress(
   stopId: string
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const stop = execution.stops.id(stopId);
-  if (!stop) throw new AppError('Stop not found', 404);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
 
   if (stop.status !== 'ARRIVED') {
-    throw new AppError('Stop must be in ARRIVED status before starting', 400);
+    throw new AppError(ApiErrorCode.STOP_MUST_BE_ARRIVED, 400);
   }
 
   stop.status = 'IN_PROGRESS';
@@ -207,13 +209,13 @@ export async function completeStop(
   data: CompleteStopInput
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const stop = execution.stops.id(stopId);
-  if (!stop) throw new AppError('Stop not found', 404);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
 
   if (!['ARRIVED', 'IN_PROGRESS'].includes(stop.status)) {
-    throw new AppError('Stop must be ARRIVED or IN_PROGRESS to complete', 400);
+    throw new AppError(ApiErrorCode.STOP_MUST_BE_ARRIVED_OR_IN_PROGRESS, 400);
   }
 
   const completedAt = new Date();
@@ -241,10 +243,10 @@ export async function skipStop(
   reason?: string
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const stop = execution.stops.id(stopId);
-  if (!stop) throw new AppError('Stop not found', 404);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
 
   stop.status = 'SKIPPED';
   if (reason) stop.deliveryNotes = reason;
@@ -261,10 +263,10 @@ export async function savePodToStop(
   signatureKey?: string
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
-  if (!execution) throw new AppError('Execution not found', 404);
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
 
   const stop = execution.stops.id(stopId);
-  if (!stop) throw new AppError('Stop not found', 404);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
 
   if (photoKey) stop.podPhoto = photoKey;
   if (signatureKey) stop.podSignature = signatureKey;

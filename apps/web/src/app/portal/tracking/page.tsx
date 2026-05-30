@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Map, AdvancedMarker, Pin, Polyline } from '@vis.gl/react-google-maps';
@@ -12,6 +14,7 @@ import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
 
 export default function PortalTrackingPage() {
+  const t = useTranslations('portal');
   const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
   const { socket } = useSocket();
   const hasToken = useHasAccessToken();
@@ -50,7 +53,7 @@ export default function PortalTrackingPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Live Tracking</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('trackingTitle')}</h1>
         <p className="text-sm text-gray-500 mt-1">Real-time driver location for your deliveries</p>
       </div>
 

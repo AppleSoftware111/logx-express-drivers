@@ -1,31 +1,65 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 
+import {
+  ApiErrorCode,
+  getApiErrorMessage,
+  translateValidationKey,
+  type SupportedLocale,
+} from '@logx/i18n';
+
 import { env } from '../config/env';
 
 export class AppError extends Error {
+  public readonly code: ApiErrorCode;
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  public readonly params?: Record<string, string | number>;
 
-  constructor(message: string, statusCode = 500, isOperational = true) {
-    super(message);
+  constructor(
+    code: ApiErrorCode,
+    statusCode = 500,
+    params?: Record<string, string | number>,
+    isOperational = true
+  ) {
+    super(code);
+    this.code = code;
     this.statusCode = statusCode;
+    this.params = params;
     this.isOperational = isOperational;
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
+function localizeValidationDetails(
+  details: Record<string, string[] | undefined>,
+  locale: SupportedLocale
+): Record<string, string[] | undefined> {
+  const out: Record<string, string[] | undefined> = {};
+  for (const [field, messages] of Object.entries(details)) {
+    out[field] = messages?.map((msg) =>
+      msg.startsWith('validation.') ? translateValidationKey(locale, msg) : msg
+    );
+  }
+  return out;
+}
+
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void {
+  const locale = req.locale ?? 'pt';
+
   if (err instanceof ZodError) {
     res.status(400).json({
       success: false,
-      error: 'Validation error',
-      details: err.flatten().fieldErrors,
+      error: {
+        code: ApiErrorCode.VALIDATION_ERROR,
+        message: getApiErrorMessage(ApiErrorCode.VALIDATION_ERROR, locale),
+      },
+      details: localizeValidationDetails(err.flatten().fieldErrors, locale),
     });
     return;
   }
@@ -33,28 +67,48 @@ export function errorHandler(
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       success: false,
-      error: err.message,
+      error: {
+        code: err.code,
+        message: getApiErrorMessage(err.code, locale, err.params),
+      },
     });
     return;
   }
 
   if (err instanceof Error && err.name === 'CastError') {
-    res.status(400).json({ success: false, error: 'Invalid ID format' });
+    res.status(400).json({
+      success: false,
+      error: {
+        code: ApiErrorCode.INVALID_ID,
+        message: getApiErrorMessage(ApiErrorCode.INVALID_ID, locale),
+      },
+    });
     return;
   }
 
   if (err instanceof Error && err.name === 'ValidationError') {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(400).json({
+      success: false,
+      error: {
+        code: ApiErrorCode.VALIDATION_ERROR,
+        message: err.message,
+      },
+    });
     return;
   }
 
-  // MongoDB duplicate key
   if (
     err instanceof Error &&
     'code' in err &&
     (err as NodeJS.ErrnoException).code === '11000'
   ) {
-    res.status(409).json({ success: false, error: 'A record with that value already exists' });
+    res.status(409).json({
+      success: false,
+      error: {
+        code: ApiErrorCode.DUPLICATE_KEY,
+        message: getApiErrorMessage(ApiErrorCode.DUPLICATE_KEY, locale),
+      },
+    });
     return;
   }
 
@@ -63,6 +117,12 @@ export function errorHandler(
 
   res.status(500).json({
     success: false,
-    error: env.NODE_ENV === 'production' ? 'Internal server error' : message,
+    error: {
+      code: ApiErrorCode.INTERNAL_ERROR,
+      message:
+        env.NODE_ENV === 'production'
+          ? getApiErrorMessage(ApiErrorCode.INTERNAL_ERROR, locale)
+          : message,
+    },
   });
 }

@@ -1,0 +1,13 @@
+{
+  "title": "Execuções",
+  "subtitle": "Rotas do dia e status das paradas",
+  "noExecutions": "Nenhuma execução encontrada",
+  "substituteDriver": "Substituir motorista",
+  "timeline": "Linha do tempo",
+  "stopWorkflow": "Fluxo da parada",
+  "arrive": "Chegar",
+  "start": "Iniciar",
+  "complete": "Concluir",
+  "skip": "Ignorar parada",
+  "waitingTime": "Tempo de espera"
+}

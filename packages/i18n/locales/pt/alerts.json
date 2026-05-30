@@ -1,0 +1,11 @@
+{
+  "title": "Alertas",
+  "subtitle": "Atrasos e eventos em tempo real",
+  "noAlerts": "Nenhum alerta",
+  "delay15": "Atraso 15 min",
+  "delay30": "Atraso 30 min",
+  "delay60": "Atraso 60+ min",
+  "onTime": "No horário",
+  "acknowledge": "Reconhecer",
+  "geofenceArrival": "Chegada automática por geocerca"
+}

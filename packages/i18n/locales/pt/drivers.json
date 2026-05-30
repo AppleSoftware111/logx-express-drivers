@@ -1,0 +1,33 @@
+{
+  "title": "Motoristas",
+  "subtitle": "Gerencie motoristas e veículos",
+  "addDriver": "Adicionar motorista",
+  "editDriver": "Editar motorista",
+  "noDrivers": "Nenhum motorista cadastrado",
+  "onlineOnly": "Apenas motoristas online",
+  "driverCount": "{count, plural, one {# motorista} other {# motoristas}}",
+  "noDriversYet": "Nenhum motorista ainda",
+  "noDriversDesc": "Adicione o primeiro motorista para atribuir rotas e acompanhar entregas.",
+  "noPhone": "Sem telefone",
+  "license": "CNH",
+  "lastSeen": "Visto por último",
+  "setOffline": "Marcar offline",
+  "setOnline": "Marcar online",
+  "editTitle": "Editar motorista",
+  "form": {
+    "name": "Nome completo",
+    "phone": "Telefone",
+    "cpf": "CPF",
+    "licenseNumber": "CNH",
+    "vehicle": "Veículo",
+    "noVehicleAssigned": "Nenhum veículo atribuído",
+    "credentialsHint": "Preencha e-mail e/ou senha apenas se quiser atualizar as credenciais de login do motorista.",
+    "email": "E-mail (conta de acesso)",
+    "password": "Senha",
+    "vehiclePlate": "Placa do veículo",
+    "vehicleModel": "Modelo",
+    "vehicleYear": "Ano",
+    "vehicleType": "Tipo de veículo",
+    "active": "Motorista ativo"
+  }
+}

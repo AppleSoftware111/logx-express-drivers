@@ -26,9 +26,39 @@ logx-express/
 │   └── mobile/       ← Expo React Native driver app
 ├── packages/
 │   ├── shared/       ← Zod schemas, TypeScript types, constants
+│   ├── i18n/         ← Translations (pt, es, en), API error codes, Zod error maps
 │   ├── tsconfig/     ← Shared TypeScript configs
 │   └── eslint-config/ ← Shared ESLint config
 └── docker-compose.yml
+```
+
+## Internationalization (i18n)
+
+Supported languages: **Portuguese (default)**, **Spanish**, **English**.
+
+| App | Library | Locale storage |
+|-----|---------|----------------|
+| Web | [next-intl](https://next-intl-docs.vercel.app/) | Cookie `LOGX_LOCALE` (no URL prefix) |
+| Mobile | i18next + expo-localization | AsyncStorage `LOGX_LOCALE` |
+| API | `@logx/i18n` | `Accept-Language` header → localized error messages |
+
+### Adding a string
+
+1. Add the key to `packages/i18n/locales/pt/<namespace>.json`
+2. Mirror in `locales/es/` and `locales/en/` (or run `node packages/i18n/scripts/merge-locales.mjs` then translate)
+3. Web: `useTranslations('namespace')` → `t('yourKey')`
+4. Mobile: `useTranslation()` → `t('namespace.yourKey')`
+5. API errors: use `ApiErrorCode` from `@logx/i18n`, not raw strings
+
+### QA locale cookie
+
+Set `LOGX_LOCALE=pt|es|en` in browser devtools → Application → Cookies, then refresh.
+
+### Scripts
+
+```bash
+npm run check-keys --workspace=@logx/i18n   # verify es/en have all pt keys
+npm run test --workspace=@logx/i18n         # resolveLocale + error message smoke tests
 ```
 
 ## Quick Start
@@ -124,6 +154,9 @@ docker-compose up -d
 
 # Or deploy to Railway/Render using package.json scripts
 ```
+
+For AWS ECS + GitHub Actions CI/CD deployment, see:
+- [docs/deployment/aws-github-actions.md](docs/deployment/aws-github-actions.md)
 
 ## Key Features
 

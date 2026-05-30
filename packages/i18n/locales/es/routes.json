@@ -1,0 +1,19 @@
+{
+  "title": "Rutas",
+  "subtitle": "Plantillas y paradas",
+  "addRoute": "Nueva ruta",
+  "editRoute": "Editar ruta",
+  "noRoutes": "No hay rutas registradas",
+  "stops": "Paradas",
+  "addStop": "Añadir parada",
+  "recurrence": "Recurrencia",
+  "scheduledTime": "Horario",
+  "daysOfWeek": "Días de la semana",
+  "form": {
+    "name": "Nombre de ruta",
+    "driver": "Conductor",
+    "client": "Cliente",
+    "stopType": "Tipo de parada",
+    "expectedDuration": "Duración esperada (min)"
+  }
+}

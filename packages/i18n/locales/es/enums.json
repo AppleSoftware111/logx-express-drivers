@@ -1,0 +1,53 @@
+{
+  "userRole": {
+    "SUPER_ADMIN": "Super administrador",
+    "ADMIN": "Administrador",
+    "OPERATOR": "Operador",
+    "CLIENT": "Cliente",
+    "DRIVER": "Conductor"
+  },
+  "vehicleType": {
+    "CAR": "Coche",
+    "MOTORCYCLE": "Moto",
+    "VAN": "Furgoneta",
+    "TRUCK": "Camión"
+  },
+  "clientType": {
+    "HOSPITAL": "Hospital",
+    "LABORATORY": "Laboratorio",
+    "OTHER": "Otro"
+  },
+  "recurrenceType": {
+    "DAILY": "Diaria",
+    "WEEKLY": "Semanal",
+    "MONTHLY": "Mensual",
+    "CUSTOM": "Personalizada"
+  },
+  "routeStopType": {
+    "PICKUP": "Recogida",
+    "DELIVERY": "Entrega",
+    "BOTH": "Recogida y entrega"
+  },
+  "executionStatus": {
+    "PENDING": "Pendiente",
+    "ASSIGNED": "Asignada",
+    "ACCEPTED": "Aceptada",
+    "IN_PROGRESS": "En curso",
+    "COMPLETED": "Completada",
+    "CANCELLED": "Cancelada"
+  },
+  "stopStatus": {
+    "PENDING": "Pendiente",
+    "ARRIVED": "Llegó",
+    "IN_PROGRESS": "En curso",
+    "COMPLETED": "Completada",
+    "SKIPPED": "Omitida"
+  },
+  "alertType": {
+    "DELAY_15": "Retraso 15 min",
+    "DELAY_30": "Retraso 30 min",
+    "DELAY_60": "Retraso 60+ min",
+    "GEOFENCE": "Geocerca",
+    "DRIVER_OFFLINE": "Conductor offline"
+  }
+}

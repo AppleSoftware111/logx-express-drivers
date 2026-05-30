@@ -2,6 +2,8 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
+import { useLocaleStore } from '../stores/localeStore';
+
 /**
  * API base URL (no /api suffix).
  * - Emulator: 10.0.2.2 → host localhost
@@ -28,8 +30,11 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(async (config) => {
   const token = await SecureStore.getItemAsync('accessToken');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (config.headers) {
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    config.headers['Accept-Language'] = useLocaleStore.getState().locale;
   }
   return config;
 });

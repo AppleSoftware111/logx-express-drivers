@@ -1,3 +1,4 @@
+import { getDelayLabel as getDelayLabelI18n, type SupportedLocale } from '@logx/i18n';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -32,12 +33,8 @@ export function getDelayColor(delayMinutes: number): string {
   return 'text-green-600 bg-green-50';
 }
 
-export function getDelayLabel(delayMinutes: number): string {
-  if (delayMinutes === 0) return 'No delay';
-  if (delayMinutes < 60) return `${delayMinutes}m late`;
-  const h = Math.floor(delayMinutes / 60);
-  const m = delayMinutes % 60;
-  return m > 0 ? `${h}h ${m}m late` : `${h}h late`;
+export function getDelayLabel(delayMinutes: number, locale: SupportedLocale = 'pt'): string {
+  return getDelayLabelI18n(delayMinutes, locale);
 }
 
 export function getStatusColor(status: string): string {

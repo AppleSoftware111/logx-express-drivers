@@ -1,0 +1,15 @@
+{
+  "dashboard": "Painel",
+  "operations": "Operações",
+  "routes": "Rotas",
+  "executions": "Execuções",
+  "drivers": "Motoristas",
+  "clients": "Clientes",
+  "reports": "Relatórios",
+  "alerts": "Alertas",
+  "settings": "Configurações",
+  "portalDashboard": "Painel do cliente",
+  "portalDeliveries": "Entregas",
+  "portalTracking": "Rastreamento",
+  "portalPod": "Comprovantes"
+}

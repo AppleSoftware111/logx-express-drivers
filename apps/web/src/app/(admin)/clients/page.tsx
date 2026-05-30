@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Building2, Pencil, Plus } from 'lucide-react';
 
@@ -30,6 +31,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function ClientsPage() {
+  const t = useTranslations('clients');
   const sessionReady = useHasAccessToken();
   const [type, setType] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -109,7 +111,7 @@ export default function ClientsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">Hospitals and laboratories</p>
         </div>
         <button

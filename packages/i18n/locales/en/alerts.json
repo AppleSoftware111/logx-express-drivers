@@ -1,0 +1,11 @@
+{
+  "title": "Alerts",
+  "subtitle": "Delays and real-time events",
+  "noAlerts": "No alerts",
+  "delay15": "15 min delay",
+  "delay30": "30 min delay",
+  "delay60": "60+ min delay",
+  "onTime": "On time",
+  "acknowledge": "Acknowledge",
+  "geofenceArrival": "Automatic geofence arrival"
+}

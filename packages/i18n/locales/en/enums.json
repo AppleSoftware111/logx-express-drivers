@@ -1,0 +1,53 @@
+{
+  "userRole": {
+    "SUPER_ADMIN": "Super admin",
+    "ADMIN": "Admin",
+    "OPERATOR": "Operator",
+    "CLIENT": "Client",
+    "DRIVER": "Driver"
+  },
+  "vehicleType": {
+    "CAR": "Car",
+    "MOTORCYCLE": "Motorcycle",
+    "VAN": "Van",
+    "TRUCK": "Truck"
+  },
+  "clientType": {
+    "HOSPITAL": "Hospital",
+    "LABORATORY": "Laboratory",
+    "OTHER": "Other"
+  },
+  "recurrenceType": {
+    "DAILY": "Daily",
+    "WEEKLY": "Weekly",
+    "MONTHLY": "Monthly",
+    "CUSTOM": "Custom"
+  },
+  "routeStopType": {
+    "PICKUP": "Pickup",
+    "DELIVERY": "Delivery",
+    "BOTH": "Pickup & delivery"
+  },
+  "executionStatus": {
+    "PENDING": "Pending",
+    "ASSIGNED": "Assigned",
+    "ACCEPTED": "Accepted",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "CANCELLED": "Cancelled"
+  },
+  "stopStatus": {
+    "PENDING": "Pending",
+    "ARRIVED": "Arrived",
+    "IN_PROGRESS": "In progress",
+    "COMPLETED": "Completed",
+    "SKIPPED": "Skipped"
+  },
+  "alertType": {
+    "DELAY_15": "15 min delay",
+    "DELAY_30": "30 min delay",
+    "DELAY_60": "60+ min delay",
+    "GEOFENCE": "Geofence",
+    "DRIVER_OFFLINE": "Driver offline"
+  }
+}

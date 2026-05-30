@@ -1,15 +1,22 @@
-import type { AxiosError } from 'axios';
+import { getClientLocale } from '@/lib/locale';
+import { resolveApiErrorMessage } from '@logx/i18n';
 
-export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as AxiosError<{ error?: string; details?: Record<string, string[]> }>;
-    const data = axiosError.response?.data;
-    if (data?.error) return data.error;
-    if (data?.details) {
-      const first = Object.values(data.details).flat()[0];
-      if (first) return first;
-    }
+export function getApiErrorFromResponse(error: unknown): string {
+  const locale = getClientLocale();
+  const axiosErr = error as {
+    response?: { data?: { error?: string | { code?: string; message?: string } } };
+  };
+  const body = axiosErr.response?.data;
+  if (body) {
+    return resolveApiErrorMessage(body, locale);
   }
   if (error instanceof Error) return error.message;
+  return resolveApiErrorMessage({}, locale);
+}
+
+/** @param fallback Shown when the error body cannot be parsed */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  const msg = getApiErrorFromResponse(error);
+  if (msg && msg !== 'INTERNAL_ERROR') return msg;
   return fallback;
 }

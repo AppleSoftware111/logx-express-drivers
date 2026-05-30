@@ -1,0 +1,17 @@
+{
+  "title": "Clientes",
+  "subtitle": "Hospitais, laboratórios e contratos",
+  "addClient": "Adicionar cliente",
+  "editClient": "Editar cliente",
+  "noClients": "Nenhum cliente cadastrado",
+  "geocodeHint": "Busque o endereço para preencher coordenadas",
+  "form": {
+    "name": "Nome",
+    "cnpj": "CNPJ",
+    "type": "Tipo",
+    "address": "Endereço",
+    "portalEmail": "E-mail do portal",
+    "portalPassword": "Senha do portal",
+    "active": "Cliente ativo"
+  }
+}

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const reportQuerySchema = z.object({
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format'),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format'),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateFormat'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateFormat'),
   driverId: z.string().optional(),
   clientId: z.string().optional(),
   format: z.enum(['json', 'csv', 'pdf']).default('json'),

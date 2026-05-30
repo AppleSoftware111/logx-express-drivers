@@ -409,13 +409,13 @@ export function RouteFormDialog({
               clients={clients}
             />
 
-            {submitError && (
+            {submitError != null ? (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-700">
                   {getApiErrorMessage(submitError, 'Failed to save route')}
                 </p>
               </div>
-            )}
+            ) : null}
 
             <DialogFooter>
               <button

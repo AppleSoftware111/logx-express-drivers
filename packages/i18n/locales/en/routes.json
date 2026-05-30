@@ -1,0 +1,19 @@
+{
+  "title": "Routes",
+  "subtitle": "Route templates and stops",
+  "addRoute": "New route",
+  "editRoute": "Edit route",
+  "noRoutes": "No routes registered",
+  "stops": "Stops",
+  "addStop": "Add stop",
+  "recurrence": "Recurrence",
+  "scheduledTime": "Scheduled time",
+  "daysOfWeek": "Days of week",
+  "form": {
+    "name": "Route name",
+    "driver": "Driver",
+    "client": "Client",
+    "stopType": "Stop type",
+    "expectedDuration": "Expected duration (min)"
+  }
+}

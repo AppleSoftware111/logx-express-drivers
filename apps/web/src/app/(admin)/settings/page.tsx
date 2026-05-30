@@ -2,11 +2,13 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Users, Globe } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function SettingsPage() {
+  const t = useTranslations('settings');
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
@@ -22,7 +24,7 @@ export default function SettingsPage() {
   return (
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-sm text-gray-500 mt-1">Company and system configuration</p>
       </div>
 

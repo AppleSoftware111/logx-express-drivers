@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, BarChart3 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
   BarChart,
   Bar,
@@ -31,6 +32,7 @@ interface DriverReport {
 }
 
 export default function ReportsPage() {
+  const t = useTranslations('reports');
   const today = new Date();
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -60,7 +62,7 @@ export default function ReportsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">Performance metrics and export</p>
         </div>
         <button

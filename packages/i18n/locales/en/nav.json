@@ -1,0 +1,15 @@
+{
+  "dashboard": "Dashboard",
+  "operations": "Operations",
+  "routes": "Routes",
+  "executions": "Executions",
+  "drivers": "Drivers",
+  "clients": "Clients",
+  "reports": "Reports",
+  "alerts": "Alerts",
+  "settings": "Settings",
+  "portalDashboard": "Client dashboard",
+  "portalDeliveries": "Deliveries",
+  "portalTracking": "Tracking",
+  "portalPod": "Proof of delivery"
+}

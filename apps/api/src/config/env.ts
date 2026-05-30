@@ -17,8 +17,8 @@ const envSchema = z.object({
 
   AWS_ACCESS_KEY_ID: z.string().default('dev-placeholder'),
   AWS_SECRET_ACCESS_KEY: z.string().default('dev-placeholder'),
-  AWS_REGION: z.string().default('us-east-1'),
-  AWS_BUCKET: z.string().default('logx-dev-bucket'),
+  AWS_REGION: z.string().default('sa-east-1'),
+  AWS_BUCKET: z.string().default('my-website-bucket'),
 
   GOOGLE_MAPS_API_KEY: z.string().default(''),
 

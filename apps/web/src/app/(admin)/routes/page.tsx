@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Plus, Eye, Power, Pencil, Route as RouteIcon } from 'lucide-react';
 
 import type { CreateRouteInput, UpdateRouteInput } from '@logx/shared';
@@ -11,8 +12,8 @@ import type { CreateRouteInput, UpdateRouteInput } from '@logx/shared';
 import {
   RouteFormDialog,
   routeDetailToFormValues,
-  type RouteFormValues,
 } from '@/components/routes/RouteFormDialog';
+import type { RouteFormValues } from '@/components/routes/RouteStopsEditor';
 import type { ClientOption } from '@/components/routes/RouteStopsEditor';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { apiClient } from '@/lib/api';
@@ -34,6 +35,7 @@ interface Route {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function RoutesPage() {
+  const t = useTranslations('routes');
   const router = useRouter();
   const sessionReady = useHasAccessToken();
   const [isActive, setIsActive] = useState<string>('true');
@@ -151,7 +153,7 @@ export default function RoutesPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Routes</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">Manage recurring delivery routes</p>
         </div>
         <button

@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api';
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
 export default function ExecutionsPage() {
+  const t = useTranslations('executions');
+  const locale = useLocale();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('');
 
@@ -27,7 +30,7 @@ export default function ExecutionsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Executions</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">Route execution history and live status</p>
         </div>
       </div>

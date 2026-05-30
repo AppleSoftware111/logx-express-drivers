@@ -1,0 +1,19 @@
+{
+  "title": "Painel ao vivo",
+  "subtitle": "Visão geral das operações em tempo real",
+  "activeDrivers": "Motoristas ativos",
+  "routesToday": "Rotas hoje",
+  "delayedRoutes": "Rotas atrasadas",
+  "completedToday": "Concluídas hoje",
+  "liveMap": "Mapa ao vivo",
+  "noDriversOnline": "Nenhum motorista online",
+  "legend": "Legenda",
+  "onRoute": "Em rota",
+  "idle": "Ocioso",
+  "delayed": "Atrasado",
+  "unreadAlerts": "Alertas não lidos",
+  "liveDriverLocations": "Localização dos motoristas",
+  "recentAlerts": "Alertas recentes",
+  "activeExecutions": "Execuções ativas",
+  "noActiveExecutions": "Nenhuma execução ativa no momento"
+}

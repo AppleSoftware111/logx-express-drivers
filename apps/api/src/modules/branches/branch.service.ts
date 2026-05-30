@@ -1,5 +1,7 @@
 import type { CreateBranchInput } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Branch } from '../../models/Branch.model';
 
@@ -9,7 +11,7 @@ export async function listBranches(companyId: string) {
 
 export async function getBranch(companyId: string, branchId: string) {
   const branch = await Branch.findOne({ companyId, _id: branchId }).select('-__v').lean();
-  if (!branch) throw new AppError('Branch not found', 404);
+  if (!branch) throw new AppError(ApiErrorCode.BRANCH_NOT_FOUND, 404);
   return branch;
 }
 
@@ -38,7 +40,7 @@ export async function updateBranch(
   const branch = await Branch.findOneAndUpdate({ companyId, _id: branchId }, update, {
     new: true,
   }).lean();
-  if (!branch) throw new AppError('Branch not found', 404);
+  if (!branch) throw new AppError(ApiErrorCode.BRANCH_NOT_FOUND, 404);
   return branch;
 }
 
@@ -48,6 +50,6 @@ export async function deleteBranch(companyId: string, branchId: string) {
     { isActive: false },
     { new: true }
   ).lean();
-  if (!branch) throw new AppError('Branch not found', 404);
+  if (!branch) throw new AppError(ApiErrorCode.BRANCH_NOT_FOUND, 404);
   return branch;
 }

@@ -1,0 +1,32 @@
+{
+  "name": "@logx/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./locales/*": "./locales/*"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-locales.mjs",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit",
+    "check-keys": "node scripts/check-keys.mjs",
+    "test": "npm run build && node scripts/test-i18n.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@logx/tsconfig": "*",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.5.0"
+  }
+}

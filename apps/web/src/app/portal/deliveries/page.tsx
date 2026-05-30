@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -8,6 +10,7 @@ import { apiClient } from '@/lib/api';
 import { formatDateTime, getStatusColor } from '@/lib/utils';
 
 export default function PortalDeliveriesPage() {
+  const t = useTranslations('portal');
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -28,7 +31,7 @@ export default function PortalDeliveriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Delivery History</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('deliveryHistory')}</h1>
         <p className="text-sm text-gray-500 mt-1">Review past deliveries and proof of delivery</p>
       </div>
 

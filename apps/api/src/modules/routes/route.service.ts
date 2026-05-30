@@ -2,6 +2,8 @@ import { addDays, format } from 'date-fns';
 
 import type { CreateRouteInput, UpdateRouteInput } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Route } from '../../models/Route.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
@@ -38,7 +40,7 @@ export async function getRoute(companyId: string, routeId: string) {
     .populate('contractId', 'slaMinutes startDate endDate')
     .populate('stops.clientId', 'name address type location')
     .lean();
-  if (!route) throw new AppError('Route not found', 404);
+  if (!route) throw new AppError(ApiErrorCode.ROUTE_NOT_FOUND, 404);
   return route;
 }
 
@@ -96,7 +98,7 @@ export async function updateRoute(
     { $set: update },
     { new: true }
   ).lean();
-  if (!route) throw new AppError('Route not found', 404);
+  if (!route) throw new AppError(ApiErrorCode.ROUTE_NOT_FOUND, 404);
   return route;
 }
 
@@ -106,7 +108,7 @@ export async function toggleRouteActive(companyId: string, routeId: string, isAc
     { isActive },
     { new: true }
   ).lean();
-  if (!route) throw new AppError('Route not found', 404);
+  if (!route) throw new AppError(ApiErrorCode.ROUTE_NOT_FOUND, 404);
   return route;
 }
 
@@ -123,7 +125,7 @@ export async function previewRouteSchedule(
   days = 7
 ): Promise<{ date: string; willRun: boolean; hasExecution: boolean }[]> {
   const route = await Route.findOne({ companyId, _id: routeId }).lean();
-  if (!route) throw new AppError('Route not found', 404);
+  if (!route) throw new AppError(ApiErrorCode.ROUTE_NOT_FOUND, 404);
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);

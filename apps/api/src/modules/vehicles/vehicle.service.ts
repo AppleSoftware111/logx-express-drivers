@@ -1,5 +1,7 @@
 import type { CreateVehicleInput, UpdateVehicleInput } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Vehicle } from '../../models/Vehicle.model';
 
@@ -9,13 +11,13 @@ export async function listVehicles(companyId: string) {
 
 export async function getVehicle(companyId: string, vehicleId: string) {
   const vehicle = await Vehicle.findOne({ companyId, _id: vehicleId }).select('-__v').lean();
-  if (!vehicle) throw new AppError('Vehicle not found', 404);
+  if (!vehicle) throw new AppError(ApiErrorCode.VEHICLE_NOT_FOUND, 404);
   return vehicle;
 }
 
 export async function createVehicle(companyId: string, data: CreateVehicleInput) {
   const existing = await Vehicle.findOne({ plate: data.plate.toUpperCase() }).lean();
-  if (existing) throw new AppError('A vehicle with this plate already exists', 409);
+  if (existing) throw new AppError(ApiErrorCode.PLATE_ALREADY_EXISTS, 409);
 
   const vehicle = await Vehicle.create({ companyId, ...data, plate: data.plate.toUpperCase() });
   return vehicle.toObject();
@@ -31,7 +33,7 @@ export async function updateVehicle(
       plate: data.plate.toUpperCase(),
       _id: { $ne: vehicleId },
     }).lean();
-    if (existing) throw new AppError('Plate already in use', 409);
+    if (existing) throw new AppError(ApiErrorCode.PLATE_ALREADY_EXISTS, 409);
   }
 
   const vehicle = await Vehicle.findOneAndUpdate(
@@ -39,7 +41,7 @@ export async function updateVehicle(
     { $set: data },
     { new: true }
   ).lean();
-  if (!vehicle) throw new AppError('Vehicle not found', 404);
+  if (!vehicle) throw new AppError(ApiErrorCode.VEHICLE_NOT_FOUND, 404);
   return vehicle;
 }
 
@@ -49,6 +51,6 @@ export async function deactivateVehicle(companyId: string, vehicleId: string) {
     { isActive: false },
     { new: true }
   ).lean();
-  if (!vehicle) throw new AppError('Vehicle not found', 404);
+  if (!vehicle) throw new AppError(ApiErrorCode.VEHICLE_NOT_FOUND, 404);
   return vehicle;
 }

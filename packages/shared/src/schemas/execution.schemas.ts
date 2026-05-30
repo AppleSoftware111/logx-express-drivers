@@ -5,7 +5,7 @@ export const updateExecutionStatusSchema = z.object({
 });
 
 export const substituteDriverSchema = z.object({
-  newDriverId: z.string().min(1, 'Driver ID is required'),
+  newDriverId: z.string().min(1, 'validation.driverIdRequired'),
 });
 
 export const updateStopStatusSchema = z.object({
@@ -22,7 +22,7 @@ export const completeStopSchema = z.object({
 export const generateExecutionsSchema = z.object({
   date: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateFormat')
     .optional(),
 });
 

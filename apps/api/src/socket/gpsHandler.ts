@@ -1,5 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 
+import { DEFAULT_LOCALE, getNestedMessage } from '@logx/i18n';
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { Driver } from '../models/Driver.model';
@@ -66,7 +67,10 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
           socket.emit(SOCKET_EVENTS.DRIVER_ARRIVED_CONFIRMED, {
             stopId: arrival.stopId,
             clientName: arrival.clientName,
-            message: `Você chegou em ${arrival.clientName}`,
+            message: (
+              getNestedMessage(DEFAULT_LOCALE, 'notifications', 'geofenceDriverArrival') ??
+              'Você chegou em {stopName}'
+            ).replace('{stopName}', arrival.clientName),
           });
 
           // Notify admin

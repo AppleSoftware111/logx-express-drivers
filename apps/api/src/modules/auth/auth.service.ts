@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 
+import { ApiErrorCode } from '@logx/i18n';
 import { BCRYPT_ROUNDS } from '@logx/shared';
 
 import { AppError } from '../../middleware/errorHandler';
@@ -33,12 +34,12 @@ export async function loginService(email: string, password: string): Promise<Log
   );
 
   if (!user || !user.isActive) {
-    throw new AppError('Invalid email or password', 401);
+    throw new AppError(ApiErrorCode.AUTH_INVALID_CREDENTIALS, 401);
   }
 
   const isValid = await bcrypt.compare(password, user.passwordHash);
   if (!isValid) {
-    throw new AppError('Invalid email or password', 401);
+    throw new AppError(ApiErrorCode.AUTH_INVALID_CREDENTIALS, 401);
   }
 
   const tokenPayload = {
@@ -76,12 +77,12 @@ export async function loginService(email: string, password: string): Promise<Log
 export async function refreshTokenService(refreshToken: string): Promise<AuthTokens> {
   const payload = verifyRefreshToken(refreshToken);
   if (!payload) {
-    throw new AppError('Invalid or expired refresh token', 401);
+    throw new AppError(ApiErrorCode.AUTH_REFRESH_INVALID, 401);
   }
 
   const user = await User.findById(payload.userId).select('+refreshTokens');
   if (!user || !user.isActive) {
-    throw new AppError('User not found or inactive', 401);
+    throw new AppError(ApiErrorCode.AUTH_USER_INACTIVE, 401);
   }
 
   const now = new Date();
@@ -92,7 +93,7 @@ export async function refreshTokenService(refreshToken: string): Promise<AuthTok
   if (!tokenRecord) {
     // Possible token reuse attack — invalidate all sessions
     await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: [] } });
-    throw new AppError('Refresh token reuse detected. All sessions invalidated.', 401);
+    throw new AppError(ApiErrorCode.AUTH_REFRESH_REUSE, 401);
   }
 
   const newTokenPayload = {
@@ -134,7 +135,7 @@ export async function getMeService(userId: string) {
     .lean();
 
   if (!user) {
-    throw new AppError('User not found', 404);
+    throw new AppError(ApiErrorCode.USER_NOT_FOUND, 404);
   }
 
   return user;

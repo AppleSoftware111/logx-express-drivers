@@ -3,6 +3,8 @@ import * as TaskManager from 'expo-task-manager';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
+import { i18n } from '../i18n';
+
 const GPS_TASK_NAME = 'logx-background-gps';
 
 export interface GpsPayload {
@@ -69,8 +71,8 @@ export async function startBackgroundGps(executionId: string): Promise<boolean> 
     timeInterval: 5_000,
     distanceInterval: 10,
     foregroundService: {
-      notificationTitle: 'LOGX Express',
-      notificationBody: 'Tracking your route…',
+      notificationTitle: i18n.t('mobile.gpsNotificationTitle'),
+      notificationBody: i18n.t('mobile.gpsNotificationBody'),
       notificationColor: '#1d4ed8',
     },
     pausesUpdatesAutomatically: false,

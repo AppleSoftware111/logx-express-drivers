@@ -1,0 +1,13 @@
+{
+  "title": "Executions",
+  "subtitle": "Today's routes and stop status",
+  "noExecutions": "No executions found",
+  "substituteDriver": "Substitute driver",
+  "timeline": "Timeline",
+  "stopWorkflow": "Stop workflow",
+  "arrive": "Arrive",
+  "start": "Start",
+  "complete": "Complete",
+  "skip": "Skip stop",
+  "waitingTime": "Waiting time"
+}

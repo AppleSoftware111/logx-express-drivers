@@ -9,8 +9,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+
+import { getExecutionStatusLabel } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
+import { useLocaleStore } from '../stores/localeStore';
 
 interface Execution {
   _id: string;
@@ -35,6 +39,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function TodayRoutesScreen({ onSelectExecution }: Props) {
+  const { t } = useTranslation();
+  const { locale } = useLocaleStore();
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['today-routes'],
     queryFn: async () => {
@@ -59,20 +65,24 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
         <View style={styles.cardHeader}>
           <Text style={styles.routeName}>{item.routeId?.name}</Text>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
-            <Text style={[styles.statusText, { color: statusColor }]}>{item.status}</Text>
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {getExecutionStatusLabel(item.status, locale)}
+            </Text>
           </View>
         </View>
 
         <View style={styles.cardBody}>
           <Text style={styles.scheduleText}>🕐 {item.scheduledTime}</Text>
           <Text style={styles.stopsText}>
-            📍 {completedStops}/{item.stops.length} stops
+            📍 {t('mobile.stopsProgress', { completed: completedStops, total: item.stops.length })}
           </Text>
         </View>
 
         {item.delayMinutes > 0 && (
           <View style={styles.delayBadge}>
-            <Text style={styles.delayText}>⚠️ {item.delayMinutes} min late</Text>
+            <Text style={styles.delayText}>
+              ⚠️ {t('mobile.minLate', { minutes: item.delayMinutes })}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -83,7 +93,7 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Loading routes…</Text>
+        <Text style={styles.loadingText}>{t('mobile.loadingRoutes')}</Text>
       </View>
     );
   }
@@ -91,7 +101,7 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Today's Routes</Text>
+        <Text style={styles.title}>{t('mobile.todayRoutes')}</Text>
         <Text style={styles.subtitle}>
           {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
         </Text>
@@ -99,7 +109,7 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
 
       {data?.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>No routes assigned today</Text>
+          <Text style={styles.emptyText}>{t('mobile.noRoutesToday')}</Text>
         </View>
       ) : (
         <FlatList

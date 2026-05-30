@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('validation.invalidEmail'),
+  password: z.string().min(1, 'validation.passwordRequired'),
 });
 
 export const refreshTokenSchema = z.object({
@@ -11,16 +11,16 @@ export const refreshTokenSchema = z.object({
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, 'Current password is required'),
+    currentPassword: z.string().min(1, 'validation.currentPasswordRequired'),
     newPassword: z
       .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number'),
+      .min(8, 'validation.passwordMin')
+      .regex(/[A-Z]/, 'validation.passwordUppercase')
+      .regex(/[0-9]/, 'validation.passwordNumber'),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match',
+    message: 'validation.passwordsDoNotMatch',
     path: ['confirmPassword'],
   });
 

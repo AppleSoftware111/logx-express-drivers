@@ -10,6 +10,9 @@ module.exports = {
     extra: {
       ...appJson.expo.extra,
       apiUrl: API_URL,
+      eas: {
+        projectId: '7140c221-d11a-4db6-944c-af967019f065',
+      },
     },
     android: {
       ...appJson.expo.android,

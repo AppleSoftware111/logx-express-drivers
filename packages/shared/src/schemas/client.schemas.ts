@@ -1,18 +1,18 @@
 import { z } from 'zod';
 
 export const createClientSchema = z.object({
-  name: z.string().min(2),
+  name: z.string().min(2, 'validation.nameMin'),
   cnpj: z
     .string()
-    .regex(/^\d{14}$/, 'CNPJ must be 14 digits')
+    .regex(/^\d{14}$/, 'validation.cnpjDigits')
     .optional(),
-  address: z.string().min(5),
+  address: z.string().min(5, 'validation.addressMin'),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   type: z.enum(['HOSPITAL', 'LABORATORY', 'OTHER']),
   createPortalUser: z.boolean().default(false),
-  portalEmail: z.string().email().optional(),
-  portalPassword: z.string().min(8).optional(),
+  portalEmail: z.string().email('validation.invalidEmail').optional(),
+  portalPassword: z.string().min(8, 'validation.passwordMin').optional(),
 });
 
 export const updateClientSchema = createClientSchema

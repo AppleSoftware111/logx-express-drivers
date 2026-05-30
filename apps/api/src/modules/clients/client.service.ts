@@ -1,6 +1,8 @@
 import type { CreateClientInput, UpdateClientInput } from '@logx/shared';
 import { UserRole } from '@logx/shared';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { AppError } from '../../middleware/errorHandler';
 import { Client } from '../../models/Client.model';
 import { User } from '../../models/User.model';
@@ -22,7 +24,7 @@ export async function getClient(companyId: string, clientId: string) {
     .select('-__v')
     .populate('userId', 'email isActive')
     .lean();
-  if (!client) throw new AppError('Client not found', 404);
+  if (!client) throw new AppError(ApiErrorCode.CLIENT_NOT_FOUND, 404);
   return client;
 }
 
@@ -31,11 +33,11 @@ export async function createClient(companyId: string, data: CreateClientInput) {
 
   if (data.createPortalUser) {
     if (!data.portalEmail || !data.portalPassword) {
-      throw new AppError('Email and password required for portal user', 400);
+      throw new AppError(ApiErrorCode.CLIENT_PORTAL_CREDENTIALS_REQUIRED, 400);
     }
 
     const existing = await User.findOne({ email: data.portalEmail.toLowerCase() }).lean();
-    if (existing) throw new AppError('Email already in use', 409);
+    if (existing) throw new AppError(ApiErrorCode.EMAIL_ALREADY_IN_USE, 409);
 
     const user = await User.create({
       companyId,
@@ -80,7 +82,7 @@ export async function updateClient(
     { $set: update },
     { new: true }
   ).lean();
-  if (!client) throw new AppError('Client not found', 404);
+  if (!client) throw new AppError(ApiErrorCode.CLIENT_NOT_FOUND, 404);
   return client;
 }
 
@@ -90,6 +92,6 @@ export async function deactivateClient(companyId: string, clientId: string) {
     { isActive: false },
     { new: true }
   ).lean();
-  if (!client) throw new AppError('Client not found', 404);
+  if (!client) throw new AppError(ApiErrorCode.CLIENT_NOT_FOUND, 404);
   return client;
 }

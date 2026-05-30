@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { ApiErrorCode } from '@logx/i18n';
 import type { UserRole } from '@logx/shared';
 
 import { AppError } from './errorHandler';
@@ -7,11 +8,11 @@ import { AppError } from './errorHandler';
 export function requireRole(...allowedRoles: UserRole[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user) {
-      return next(new AppError('Not authenticated', 401));
+      return next(new AppError(ApiErrorCode.AUTH_NOT_AUTHENTICATED, 401));
     }
 
     if (!allowedRoles.includes(req.user.role as UserRole)) {
-      return next(new AppError('Insufficient permissions', 403));
+      return next(new AppError(ApiErrorCode.INSUFFICIENT_PERMISSIONS, 403));
     }
 
     next();
@@ -20,7 +21,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
 
 export function requireCompanyMatch(req: Request, _res: Response, next: NextFunction): void {
   if (!req.user) {
-    return next(new AppError('Not authenticated', 401));
+    return next(new AppError(ApiErrorCode.AUTH_NOT_AUTHENTICATED, 401));
   }
 
   if (req.user.role === 'SUPER_ADMIN') {
@@ -29,7 +30,7 @@ export function requireCompanyMatch(req: Request, _res: Response, next: NextFunc
 
   const companyIdParam = req.params.companyId;
   if (companyIdParam && companyIdParam !== req.user.companyId) {
-    return next(new AppError('Access denied to this company', 403));
+    return next(new AppError(ApiErrorCode.COMPANY_ACCESS_DENIED, 403));
   }
 
   next();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { CheckCircle, Clock, Package, Truck } from 'lucide-react';
 import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 
@@ -10,6 +11,7 @@ import { useHasAccessToken } from '@/lib/authToken';
 import { getStatusColor } from '@/lib/utils';
 
 export default function PortalDashboardPage() {
+  const t = useTranslations('portal');
   const today = new Date().toISOString().slice(0, 10);
   const hasToken = useHasAccessToken();
 
@@ -35,7 +37,7 @@ export default function PortalDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Today's Deliveries</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('todayDeliveries')}</h1>
         <p className="text-sm text-gray-500 mt-1">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>

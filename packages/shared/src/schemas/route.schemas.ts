@@ -3,7 +3,7 @@ import { z } from 'zod';
 const routeStopSchema = z.object({
   clientId: z.string().min(1),
   order: z.number().int().min(0),
-  address: z.string().min(5),
+  address: z.string().min(5, 'validation.addressMin'),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   expectedDurationMinutes: z.number().int().min(1).default(15),
@@ -12,19 +12,19 @@ const routeStopSchema = z.object({
 
 export const createRouteSchema = z.object({
   contractId: z.string().optional(),
-  name: z.string().min(2, 'Route name must be at least 2 characters'),
+  name: z.string().min(2, 'validation.routeNameMin'),
   description: z.string().optional(),
   recurrenceType: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM']),
   daysOfWeek: z
     .array(z.number().int().min(0).max(6))
-    .min(1, 'At least one day is required')
+    .min(1, 'validation.daysRequired')
     .optional(),
   scheduledTime: z
     .string()
-    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Time must be in HH:mm format (e.g. '08:45')"),
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'validation.timeFormat'),
   isTemplate: z.boolean().default(false),
   defaultDriverId: z.string().optional(),
-  stops: z.array(routeStopSchema).min(1, 'At least one stop is required'),
+  stops: z.array(routeStopSchema).min(1, 'validation.stopsRequired'),
 });
 
 export const updateRouteSchema = createRouteSchema.partial();

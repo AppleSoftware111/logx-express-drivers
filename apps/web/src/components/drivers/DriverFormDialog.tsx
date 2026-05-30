@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -30,6 +31,22 @@ const driverFormSchema = z
     password: z.string().optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.email?.trim() && !z.string().email().safeParse(data.email).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid email address',
+        path: ['email'],
+      });
+    }
+
+    if (data.password?.trim() && data.password.trim().length < 8) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Password must be at least 8 characters',
+        path: ['password'],
+      });
+    }
+
     if (data.phone?.trim()) {
       const digits = data.phone.replace(/\D/g, '');
       if (digits.length < 10 || digits.length > 15) {
@@ -103,9 +120,14 @@ interface DriverFormDialogProps {
   onSubmit: (payload: CreateDriverInput | UpdateDriverInput) => void;
 }
 
-function normalizePayload(values: DriverFormValues): CreateDriverInput | UpdateDriverInput {
+function normalizePayload(
+  values: DriverFormValues,
+  isEdit: boolean
+): CreateDriverInput | UpdateDriverInput {
   const phoneDigits = values.phone?.replace(/\D/g, '');
   const cpfDigits = values.cpf?.replace(/\D/g, '');
+  const normalizedEmail = values.email?.trim().toLowerCase();
+  const normalizedPassword = values.password?.trim();
 
   const base = {
     name: values.name.trim(),
@@ -119,9 +141,17 @@ function normalizePayload(values: DriverFormValues): CreateDriverInput | UpdateD
     return {
       ...base,
       createUserAccount: true,
-      email: values.email?.trim().toLowerCase(),
-      password: values.password,
+      email: normalizedEmail,
+      password: normalizedPassword,
     } as CreateDriverInput;
+  }
+
+  if (isEdit) {
+    return {
+      ...base,
+      email: normalizedEmail || undefined,
+      password: normalizedPassword || undefined,
+    } as UpdateDriverInput;
   }
 
   return base;
@@ -143,6 +173,7 @@ export function DriverFormDialog({
   onSubmit,
 }: DriverFormDialogProps) {
   const isEdit = mode === 'edit';
+  const t = useTranslations('drivers');
 
   const {
     register,
@@ -195,14 +226,8 @@ export function DriverFormDialog({
   }, [open, isEdit, initial, reset]);
 
   const handleFormSubmit = (values: DriverFormValues) => {
-    const payload = normalizePayload(values);
-    if (isEdit) {
-      const { createUserAccount: _c, email: _e, password: _p, ...updatePayload } =
-        payload as CreateDriverInput;
-      onSubmit(updatePayload);
-      return;
-    }
-    onSubmit(payload as CreateDriverInput);
+    const payload = normalizePayload(values, isEdit);
+    onSubmit(payload);
   };
 
   const inputClass =
@@ -263,7 +288,7 @@ export function DriverFormDialog({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>License number</label>
+              <label className={labelClass}>{t('form.licenseNumber')}</label>
               <input
                 {...register('licenseNumber')}
                 className={inputClass}
@@ -271,9 +296,9 @@ export function DriverFormDialog({
               />
             </div>
             <div>
-              <label className={labelClass}>Vehicle</label>
+              <label className={labelClass}>{t('form.vehicle')}</label>
               <select {...register('vehicleId')} className={inputClass}>
-                <option value="">No vehicle assigned</option>
+                <option value="">{t('form.noVehicleAssigned')}</option>
                 {vehicles.map((v) => (
                   <option key={v._id} value={v._id}>
                     {v.plate} — {v.model} ({v.type})
@@ -283,7 +308,7 @@ export function DriverFormDialog({
             </div>
           </div>
 
-          {!isEdit && (
+          {!isEdit ? (
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -330,15 +355,49 @@ export function DriverFormDialog({
                 </div>
               )}
             </div>
-          )}
-
-          {submitError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">
-                {getApiErrorMessage(submitError, 'Failed to save driver')}
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                {t('form.credentialsHint')}
               </p>
+              <div className="grid grid-cols-1 gap-3 pt-1">
+                <div>
+                  <label className={labelClass}>{t('form.email')}</label>
+                  <input
+                    {...register('email')}
+                    type="email"
+                    className={inputClass}
+                    placeholder="driver@company.com"
+                    autoComplete="off"
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelClass}>{t('form.password')}</label>
+                  <input
+                    {...register('password')}
+                    type="password"
+                    className={inputClass}
+                    placeholder="Min. 8 characters"
+                    autoComplete="new-password"
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
+
+          {submitError != null ? (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">
+                  {getApiErrorMessage(submitError, 'Failed to save driver')}
+                </p>
+              </div>
+            ) : null}
 
           <DialogFooter>
             <button

@@ -1,0 +1,17 @@
+{
+  "title": "Clients",
+  "subtitle": "Hospitals, labs and contracts",
+  "addClient": "Add client",
+  "editClient": "Edit client",
+  "noClients": "No clients registered",
+  "geocodeHint": "Search address to fill coordinates",
+  "form": {
+    "name": "Name",
+    "cnpj": "CNPJ",
+    "type": "Type",
+    "address": "Address",
+    "portalEmail": "Portal email",
+    "portalPassword": "Portal password",
+    "active": "Active client"
+  }
+}

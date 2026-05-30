@@ -2,6 +2,7 @@ import axios from 'axios';
 
 import type { ApiResponse } from '@logx/shared';
 
+import { getClientLocale } from '@/lib/locale';
 import { useAuthStore } from '@/stores/authStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -35,6 +36,9 @@ apiClient.interceptors.request.use((config) => {
     const stored = localStorage.getItem('accessToken');
     if (stored && config.headers) {
       config.headers.Authorization = `Bearer ${stored}`;
+    }
+    if (config.headers) {
+      config.headers['Accept-Language'] = getClientLocale();
     }
   }
   return config;

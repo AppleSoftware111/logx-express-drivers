@@ -1,20 +1,22 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import { AppError } from './errorHandler';
+import { ApiErrorCode } from '@logx/i18n';
+
 import { verifyAccessToken } from '../utils/jwtHelpers';
+import { AppError } from './errorHandler';
 
 export function authenticate(req: Request, _res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
-    return next(new AppError('Access token missing', 401));
+    return next(new AppError(ApiErrorCode.AUTH_TOKEN_MISSING, 401));
   }
 
   const token = authHeader.slice(7);
 
   const payload = verifyAccessToken(token);
   if (!payload) {
-    return next(new AppError('Invalid or expired access token', 401));
+    return next(new AppError(ApiErrorCode.AUTH_TOKEN_EXPIRED, 401));
   }
 
   req.user = {

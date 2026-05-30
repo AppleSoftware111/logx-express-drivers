@@ -1,0 +1,19 @@
+{
+  "title": "Rotas",
+  "subtitle": "Modelos de rota e paradas",
+  "addRoute": "Nova rota",
+  "editRoute": "Editar rota",
+  "noRoutes": "Nenhuma rota cadastrada",
+  "stops": "Paradas",
+  "addStop": "Adicionar parada",
+  "recurrence": "Recorrência",
+  "scheduledTime": "Horário",
+  "daysOfWeek": "Dias da semana",
+  "form": {
+    "name": "Nome da rota",
+    "driver": "Motorista",
+    "client": "Cliente",
+    "stopType": "Tipo de parada",
+    "expectedDuration": "Duração esperada (min)"
+  }
+}
