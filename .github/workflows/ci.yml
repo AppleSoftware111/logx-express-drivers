@@ -30,13 +30,13 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        run: npx turbo run lint --filter=@logx/api... --filter=@logx/web...
 
       - name: Type check
-        run: npm run type-check
+        run: npx turbo run type-check --filter=@logx/api... --filter=@logx/web...
 
       - name: Build
-        run: npm run build
+        run: npx turbo run build --filter=@logx/api... --filter=@logx/web...
 
   secret-scan:
     name: Secret scan (gitleaks)
