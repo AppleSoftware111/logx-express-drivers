@@ -15,7 +15,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { setAuth, logout } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<AuthStatus>('loading');
-
+  // 
   useEffect(() => {
     const finish = () => setHydrated(true);
     if (useAuthStore.persist.hasHydrated()) {
