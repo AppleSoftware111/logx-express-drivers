@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "paths": {
-      "@logx/shared": ["../../packages/shared/dist/index.js"]
+      "@logx/shared": ["../../packages/shared/dist/index.d.ts"]
     }
   },
   "include": ["src"],
