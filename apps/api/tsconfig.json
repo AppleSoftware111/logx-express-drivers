@@ -3,9 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "paths": {
-      "@logx/shared": ["../../packages/shared/src/index.ts"]
+      "@logx/shared": ["../../packages/shared/dist/index.js"]
     }
   },
-  "include": ["src", "../../packages/shared/src"],
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }

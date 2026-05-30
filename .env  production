@@ -1,0 +1,28 @@
+# Local development — copy from .env.example and adjust as needed
+MONGODB_URI=mongodb+srv://jpfigueroadeveloper_db_user:gJrXYniZREIXyaSd@cluster0.swnzxoq.mongodb.net/?appName=Cluster0
+# username: jpfigueroadeveloper_db_user  password:gJrXYniZREIXyaSd
+REDIS_URL=redis://127.0.0.1:6379
+
+JWT_SECRET=your_jwt_secret_must_be_at_least_32_characters_long
+JWT_REFRESH_SECRET=your_refresh_secret_must_be_at_least_32_chars
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+
+AWS_ACCESS_KEY_ID=dev-placeholder
+AWS_SECRET_ACCESS_KEY=dev-placeholder
+AWS_REGION=sa-east-1
+AWS_BUCKET=my-website-bucket-logx
+
+GOOGLE_MAPS_API_KEY=AIzaSyDnNO1jk3cwoDrPLjK7vo4MO-v4fSu1uh0
+
+WHATSAPP_PROVIDER=zapi
+ZAPI_INSTANCE_ID=
+ZAPI_TOKEN=
+
+PORT=4000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3001
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+
+SEED_SUPER_ADMIN_EMAIL=admin@logxexpress.com
+SEED_SUPER_ADMIN_PASSWORD=ChangeMe123!
