@@ -1,7 +1,7 @@
 # Local development — copy from .env.example and adjust as needed
 MONGODB_URI=mongodb+srv://jpfigueroadeveloper_db_user:gJrXYniZREIXyaSd@cluster0.swnzxoq.mongodb.net/?appName=Cluster0
 # username: jpfigueroadeveloper_db_user  password:gJrXYniZREIXyaSd
-REDIS_URL=redis://127.0.0.1:6379
+REDIS_URL=rediss://logx-redis-99tdwvj.serverless.sae1.cache.amazonaws.com:6379
 
 JWT_SECRET=your_jwt_secret_must_be_at_least_32_characters_long
 JWT_REFRESH_SECRET=your_refresh_secret_must_be_at_least_32_chars

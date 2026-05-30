@@ -88,6 +88,12 @@ jobs:
       - name: Deploy API service
         env:
           NEW_IMAGE: ${{ steps.build-api.outputs.image }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
         run: |
           set -euo pipefail
           SERVICE_TASK_DEF_ARN="$(aws ecs describe-services \
@@ -99,9 +105,29 @@ jobs:
           aws ecs describe-task-definition --task-definition "$SERVICE_TASK_DEF_ARN" \
             --query 'taskDefinition' > task-def-api.json
 
-          cat task-def-api.json | jq --arg IMAGE "$NEW_IMAGE" --arg NAME "$ECS_CONTAINER_API" '
+          cat task-def-api.json | jq \
+            --arg IMAGE "$NEW_IMAGE" \
+            --arg NAME "$ECS_CONTAINER_API" \
+            --arg MONGODB_URI "$MONGODB_URI" \
+            --arg REDIS_URL "$REDIS_URL" \
+            --arg JWT_SECRET "$JWT_SECRET" \
+            --arg JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET" \
+            --arg FRONTEND_URL "$FRONTEND_URL" \
+            --arg CORS_ORIGINS "$CORS_ORIGINS" \
+            '
             .containerDefinitions = (.containerDefinitions | map(
-              if .name == $NAME then .image = $IMAGE else . end
+              if .name == $NAME then
+                .image = $IMAGE |
+                .environment = [
+                  {"name": "NODE_ENV", "value": "production"},
+                  {"name": "MONGODB_URI", "value": $MONGODB_URI},
+                  {"name": "REDIS_URL", "value": $REDIS_URL},
+                  {"name": "JWT_SECRET", "value": $JWT_SECRET},
+                  {"name": "JWT_REFRESH_SECRET", "value": $JWT_REFRESH_SECRET},
+                  {"name": "FRONTEND_URL", "value": $FRONTEND_URL},
+                  {"name": "CORS_ORIGINS", "value": $CORS_ORIGINS}
+                ]
+              else . end
             )) |
             del(
               .taskDefinitionArn,
@@ -112,7 +138,7 @@ jobs:
               .registeredAt,
               .registeredBy
             )
-          ' > task-def-api-updated.json
+            ' > task-def-api-updated.json
 
           NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
             --cli-input-json file://task-def-api-updated.json \
@@ -138,9 +164,17 @@ jobs:
           aws ecs describe-task-definition --task-definition "$SERVICE_TASK_DEF_ARN" \
             --query 'taskDefinition' > task-def-web.json
 
-          cat task-def-web.json | jq --arg IMAGE "$NEW_IMAGE" --arg NAME "$ECS_CONTAINER_WEB" '
+          cat task-def-web.json | jq \
+            --arg IMAGE "$NEW_IMAGE" \
+            --arg NAME "$ECS_CONTAINER_WEB" \
+            '
             .containerDefinitions = (.containerDefinitions | map(
-              if .name == $NAME then .image = $IMAGE else . end
+              if .name == $NAME then
+                .image = $IMAGE |
+                .environment = [
+                  {"name": "NODE_ENV", "value": "production"}
+                ]
+              else . end
             )) |
             del(
               .taskDefinitionArn,
@@ -151,7 +185,7 @@ jobs:
               .registeredAt,
               .registeredBy
             )
-          ' > task-def-web-updated.json
+            ' > task-def-web-updated.json
 
           NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
             --cli-input-json file://task-def-web-updated.json \
