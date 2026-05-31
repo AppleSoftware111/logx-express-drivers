@@ -223,8 +223,10 @@ jobs:
           NODE_ENV: production
         run: |
           set -euo pipefail
+          npm run build --workspace=@logx/shared
+          npm run build --workspace=@logx/i18n
           cd apps/api
-          npm run seed
+          npx ts-node --transpile-only src/scripts/seed.ts
 
       - name: Invalidate CloudFront cache
         if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
