@@ -3,8 +3,8 @@ MONGODB_URI=mongodb+srv://jpfigueroadeveloper_db_user:gJrXYniZREIXyaSd@cluster0.
 # username: jpfigueroadeveloper_db_user  password:gJrXYniZREIXyaSd
 REDIS_URL=rediss://logx-redis-99dvwj.serverless.sae1.cache.amazonaws.com:6379
 
-JWT_SECRET=your_jwt_secret_must_be_at_least_32_characters_long
-JWT_REFRESH_SECRET=your_refresh_secret_must_be_at_least_32_chars
+JWT_SECRET=eed6b6c3b0d57c8af96fc1354f148e6ed348b0c9afc35d6001bed40bf993cfc3
+JWT_REFRESH_SECRET=9bfbdad8747c85f3f139ed23aa408884ea606f6e02a4e8412d87f5aa1b5fe759
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
