@@ -24,7 +24,7 @@ export function LoginForm() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: 'admin@logxexpress.com',
-      password: 'ChangeMe123!',
+      password: 'admin123!@#',
     },
   });
 

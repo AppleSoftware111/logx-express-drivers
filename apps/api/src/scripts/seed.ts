@@ -10,7 +10,7 @@ async function seed(): Promise<void> {
   await connectDB();
 
   const email = env.SEED_SUPER_ADMIN_EMAIL ?? 'admin@logxexpress.com';
-  const password = env.SEED_SUPER_ADMIN_PASSWORD ?? 'ChangeMe123!';
+  const password = env.SEED_SUPER_ADMIN_PASSWORD ?? 'admin123!@#';
 
   const existing = await User.findOne({ email }).lean();
   if (existing) {
