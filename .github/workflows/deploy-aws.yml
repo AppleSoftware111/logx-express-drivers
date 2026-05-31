@@ -212,6 +212,7 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
           SEED_SUPER_ADMIN_EMAIL: ${{ vars.SEED_SUPER_ADMIN_EMAIL || 'admin@logxexpress.com' }}
           SEED_SUPER_ADMIN_PASSWORD: ${{ secrets.SEED_SUPER_ADMIN_PASSWORD }}
           NODE_ENV: production
