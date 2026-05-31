@@ -33,9 +33,10 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
-COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# ✅ server.js is inside apps/web/ in the standalone output
+CMD ["node", "apps/web/server.js"]
