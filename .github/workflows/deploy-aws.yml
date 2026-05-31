@@ -206,26 +206,6 @@ jobs:
             --service "$ECS_SERVICE_WEB" \
             --task-definition "$NEW_TASK_DEF_ARN"
 
-      - name: Wait for services to stabilize
-        run: |
-          set -euo pipefail
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE_API"
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE_WEB"
-
-      - name: Run database seeding
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          SEED_SUPER_ADMIN_EMAIL: ${{ vars.SEED_SUPER_ADMIN_EMAIL || 'admin@logxexpress.com' }}
-          SEED_SUPER_ADMIN_PASSWORD: ${{ secrets.SEED_SUPER_ADMIN_PASSWORD }}
-          NODE_ENV: production
-        run: |
-          set -euo pipefail
-          cd apps/api
-          npm run seed
-
       - name: Invalidate CloudFront cache
         if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
