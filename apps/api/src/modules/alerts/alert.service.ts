@@ -2,12 +2,18 @@ import type { SupportedLocale } from '@logx/i18n';
 import { formatMessage } from '@logx/i18n';
 import type { AlertType } from '@logx/shared';
 
-import { Alert, type IAlert } from '../../models/Alert.model';
+import { Alert } from '../../models/Alert.model';
 
 type AlertMessageParams = Record<string, string | number>;
+type LocalizableAlert = {
+  message: string;
+  messageKey?: string | null;
+  messageParams?: AlertMessageParams | null;
+};
+type LocalizedAlertRecord = LocalizableAlert & Record<string, unknown>;
 
 function localizeAlertMessage(
-  alert: Pick<IAlert, 'message' | 'messageKey' | 'messageParams'>,
+  alert: LocalizableAlert,
   locale: SupportedLocale
 ) {
   if (!alert.messageKey) return alert.message;
@@ -26,7 +32,7 @@ export async function listAlerts(
   page: number,
   limit: number,
   locale: SupportedLocale
-) {
+): Promise<{ alerts: LocalizedAlertRecord[]; total: number }> {
   const query: Record<string, unknown> = { companyId };
   if (filters.isRead !== undefined) query.isRead = filters.isRead;
   if (filters.type) query.type = filters.type;
@@ -45,9 +51,9 @@ export async function listAlerts(
   ]);
 
   return {
-    alerts: alerts.map((alert) => ({
+    alerts: alerts.map((alert): LocalizedAlertRecord => ({
       ...alert,
-      message: localizeAlertMessage(alert as IAlert, locale),
+      message: localizeAlertMessage(alert, locale),
     })),
     total,
   };
@@ -96,12 +102,12 @@ export async function getUnreadCount(companyId: string): Promise<number> {
   return Alert.countDocuments({ companyId, isRead: false });
 }
 
-export function localizeAlertDocument<T extends Pick<IAlert, 'message' | 'messageKey' | 'messageParams'>>(
+export function localizeAlertDocument<T extends LocalizableAlert>(
   alert: T,
   locale: SupportedLocale
 ): T & { message: string } {
   return {
     ...alert,
-    message: localizeAlertMessage(alert as IAlert, locale),
+    message: localizeAlertMessage(alert, locale),
   };
 }
