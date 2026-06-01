@@ -37,8 +37,12 @@ export function LoginForm() {
       </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="mx-auto mb-5 flex max-w-[280px] items-center justify-center rounded-3xl bg-white/95 p-4 shadow-2xl">
-            <img src="/logo-biopoli.svg" alt={tCommon('appName')} className="h-16 w-auto rounded-2xl" />
+          <div className="mx-auto mb-5 flex w-full max-w-[320px] items-center justify-center rounded-3xl bg-white/95 p-4 shadow-2xl">
+            <img
+              src="/logo-biopoli-ui.svg"
+              alt={tCommon('appName')}
+              className="h-16 w-full object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-white">LOGX BioPoli</h1>
           <p className="text-blue-200 mt-1 text-sm">{t('signInSubtitle')}</p>

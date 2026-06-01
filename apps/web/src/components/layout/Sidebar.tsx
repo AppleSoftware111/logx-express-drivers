@@ -49,7 +49,11 @@ export function Sidebar() {
     <aside className="flex flex-col w-64 min-h-screen bg-gray-900 text-white shrink-0">
       <div className="border-b border-gray-800 px-4 py-4">
         <div className="rounded-2xl bg-white/95 p-3 shadow-lg">
-          <img src="/logo-biopoli.svg" alt={tCommon('appName')} className="h-12 w-full rounded-xl object-contain" />
+          <img
+            src="/logo-biopoli-ui.svg"
+            alt={tCommon('appName')}
+            className="h-12 w-full object-contain"
+          />
         </div>
       </div>
 

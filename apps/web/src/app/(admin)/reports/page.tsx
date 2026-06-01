@@ -75,7 +75,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Date range filter */}
-      <div className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-end gap-3 bg-white rounded-xl border border-gray-200 p-4">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Start date</label>
           <input
@@ -94,7 +94,7 @@ export default function ReportsPage() {
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <div className="flex items-end">
+        <div className="ml-auto flex items-end">
           <button
             onClick={() => setAppliedRange({ startDate, endDate })}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
