@@ -33,5 +33,5 @@ export const patchContract = asyncHandler(async (req: Request, res: Response) =>
 
 export const deleteContract = asyncHandler(async (req: Request, res: Response) => {
   await deactivateContract(req.user!.companyId, req.params.id);
-  return sendSuccess(res, { message: 'Contract deactivated' });
+  return sendSuccess(res, { success: true });
 });

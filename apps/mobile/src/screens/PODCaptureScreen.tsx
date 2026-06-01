@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as FileSystem from 'expo-file-system';
+import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../services/api';
 
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: Props) {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [mode, setMode] = useState<'idle' | 'camera'>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -33,7 +35,10 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
 
   const takePhoto = async () => {
     if (!permission?.granted) {
-      await requestPermission();
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert(t('common.errorTitle'), t('mobile.cameraPermissionDenied'));
+      }
       return;
     }
     setMode('camera');
@@ -77,11 +82,11 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
         deliveryNotes: notes,
       });
 
-      Alert.alert('Success', 'POD captured and stop completed!', [
+      Alert.alert(t('common.successSaved'), t('mobile.podSuccess'), [
         { text: 'OK', onPress: onSuccess },
       ]);
     } catch (err) {
-      Alert.alert('Error', 'Failed to submit POD. Please try again.');
+      Alert.alert(t('common.errorTitle'), t('mobile.podSubmitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -94,7 +99,7 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
           <View style={styles.cameraControls}>
             <TouchableOpacity style={styles.captureBtn} onPress={capturePhoto} />
             <TouchableOpacity style={styles.cancelCameraBtn} onPress={() => setMode('idle')}>
-              <Text style={{ color: '#fff', fontWeight: '600' }}>Cancel</Text>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </CameraView>
@@ -105,12 +110,12 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Proof of Delivery</Text>
-        <Text style={styles.subtitle}>Capture photo and receiver information</Text>
+        <Text style={styles.title}>{t('mobile.proofOfDelivery')}</Text>
+        <Text style={styles.subtitle}>{t('mobile.captureReceiverInfo')}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Photo</Text>
+        <Text style={styles.sectionTitle}>{t('common.photo')}</Text>
         {photoUri ? (
           <View>
             <Image source={{ uri: photoUri }} style={styles.photoPreview} />
@@ -118,34 +123,34 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
               style={[styles.btn, { marginTop: 8 }]}
               onPress={() => setPhotoUri(null)}
             >
-              <Text style={styles.btnText}>Retake Photo</Text>
+              <Text style={styles.btnText}>{t('mobile.retakePhoto')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity style={[styles.btn, styles.photoBtn]} onPress={takePhoto}>
-            <Text style={[styles.btnText, { color: '#2563eb' }]}>📷 Take Photo</Text>
+            <Text style={[styles.btnText, { color: '#2563eb' }]}>📷 {t('mobile.takePhoto')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Receiver Information</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.receiverInformation')}</Text>
 
-        <Text style={styles.fieldLabel}>Receiver Name</Text>
+        <Text style={styles.fieldLabel}>{t('mobile.receiverName')}</Text>
         <TextInput
           style={styles.input}
           value={receiverName}
           onChangeText={setReceiverName}
-          placeholder="Enter receiver's full name"
+          placeholder={t('mobile.receiverNamePlaceholder')}
           placeholderTextColor="#9ca3af"
         />
 
-        <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Notes (optional)</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 12 }]}>{t('common.notes')}</Text>
         <TextInput
           style={[styles.input, styles.textarea]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Any delivery notes…"
+          placeholder={t('mobile.notesPlaceholder')}
           placeholderTextColor="#9ca3af"
           multiline
           numberOfLines={3}
@@ -154,7 +159,7 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
+          <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -165,7 +170,7 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
           {submitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitBtnText}>✅ Complete Stop</Text>
+            <Text style={styles.submitBtnText}>✅ {t('mobile.completeStop')}</Text>
           )}
         </TouchableOpacity>
       </View>

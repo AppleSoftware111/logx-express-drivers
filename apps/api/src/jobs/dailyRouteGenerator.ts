@@ -1,42 +1,47 @@
 import cron from 'node-cron';
 
+import { env } from '../config/env';
 import { Route } from '../models/Route.model';
 import { RouteExecution } from '../models/RouteExecution.model';
 import { Driver } from '../models/Driver.model';
+import { User } from '../models/User.model';
 import {
   buildRouteAssignedMessage,
   sendWhatsApp,
 } from '../modules/notifications/notification.service';
-import { matchesDayOfWeek, toDateString } from '../utils/timeCalc';
+import {
+  businessDateStringToUtcDate,
+  getCurrentBusinessDateString,
+  routeRunsOnDate,
+  toDateString,
+} from '../utils/timeCalc';
 
 export function startDailyRouteGeneratorJob(): void {
-  // Runs every day at 00:01 UTC
-  cron.schedule('1 0 * * *', async () => {
-    console.info('[job:dailyRouteGenerator] Starting daily route generation');
+  cron.schedule(
+    '1 0 * * *',
+    async () => {
+      console.info('[job:dailyRouteGenerator] Starting daily route generation');
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const dayOfWeek = today.getUTCDay();
-    const dayOfMonth = today.getUTCDate();
+      const today = businessDateStringToUtcDate(getCurrentBusinessDateString());
 
-    try {
-      await generateRoutesForDate(today, dayOfWeek, dayOfMonth);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[job:dailyRouteGenerator] Fatal error:', msg);
-    }
-  });
+      try {
+        await generateRoutesForDate(today);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[job:dailyRouteGenerator] Fatal error:', msg);
+      }
+    },
+    { timezone: env.APP_TIMEZONE }
+  );
 
-  console.info('[job:dailyRouteGenerator] Scheduled for 00:01 UTC daily');
+  console.info(`[job:dailyRouteGenerator] Scheduled for 00:01 daily (${env.APP_TIMEZONE})`);
 }
 
 export async function generateRoutesForDate(
-  targetDate: Date,
-  dayOfWeek?: number,
-  dayOfMonth?: number
+  targetDate: Date
 ): Promise<{ generated: number; skipped: number }> {
-  const dow = dayOfWeek ?? targetDate.getUTCDay();
-  const dom = dayOfMonth ?? targetDate.getUTCDate();
+  const normalizedDate = new Date(targetDate);
+  normalizedDate.setUTCHours(0, 0, 0, 0);
 
   const activeRoutes = await Route.find({ isActive: true, isTemplate: false })
     .populate('defaultDriverId', 'name phone')
@@ -47,7 +52,7 @@ export async function generateRoutesForDate(
 
   for (const route of activeRoutes) {
     try {
-      const shouldRun = routeShouldRunToday(route, dow, dom);
+      const shouldRun = routeRunsOnDate(route, normalizedDate);
       if (!shouldRun) {
         skipped++;
         continue;
@@ -63,7 +68,7 @@ export async function generateRoutesForDate(
         companyId: route.companyId,
         routeId: route._id,
         contractId: route.contractId,
-        scheduledDate: targetDate,
+        scheduledDate: normalizedDate,
         scheduledTime: route.scheduledTime,
         driverId: route.defaultDriverId,
         originalDriverId: route.defaultDriverId,
@@ -76,14 +81,17 @@ export async function generateRoutesForDate(
           order: s.order,
           address: s.address,
           location: s.location,
+          plannedTime: s.plannedTime,
+          expectedDurationMinutes: s.expectedDurationMinutes ?? 15,
           type: s.type,
+          instructions: s.instructions,
           status: 'PENDING',
         })),
       };
 
       // Atomic upsert — safe if cron fires twice
       const result = await RouteExecution.findOneAndUpdate(
-        { routeId: route._id, scheduledDate: targetDate },
+        { routeId: route._id, scheduledDate: normalizedDate },
         { $setOnInsert: executionData },
         { upsert: true, new: false, setDefaultsOnInsert: true }
       );
@@ -95,9 +103,17 @@ export async function generateRoutesForDate(
         // Send WhatsApp notification to driver
         const driver = await Driver.findById(route.defaultDriverId).select('name phone').lean();
         if (driver?.phone) {
+          const driverUser = await User.findOne({ driverId: route.defaultDriverId })
+            .select('locale')
+            .lean();
           await sendWhatsApp(
             driver.phone,
-            buildRouteAssignedMessage(driver.name, route.name, route.scheduledTime)
+            buildRouteAssignedMessage(
+              driver.name,
+              route.name,
+              route.scheduledTime,
+              driverUser?.locale ?? 'pt'
+            )
           );
         }
       } else {
@@ -111,26 +127,7 @@ export async function generateRoutesForDate(
   }
 
   console.info(
-    `[job:dailyRouteGenerator] Date: ${toDateString(targetDate)} — Generated: ${generated}, Skipped: ${skipped}`
+    `[job:dailyRouteGenerator] Date: ${toDateString(normalizedDate)} — Generated: ${generated}, Skipped: ${skipped}`
   );
   return { generated, skipped };
-}
-
-function routeShouldRunToday(
-  route: { recurrenceType: string; daysOfWeek: number[] },
-  dayOfWeek: number,
-  dayOfMonth: number
-): boolean {
-  switch (route.recurrenceType) {
-    case 'DAILY':
-      return true;
-    case 'WEEKLY':
-      return route.daysOfWeek.includes(dayOfWeek);
-    case 'MONTHLY':
-      return route.daysOfWeek.includes(dayOfMonth);
-    case 'CUSTOM':
-      return route.daysOfWeek.includes(dayOfWeek);
-    default:
-      return false;
-  }
 }

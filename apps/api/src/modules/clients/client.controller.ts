@@ -34,5 +34,5 @@ export const patchClient = asyncHandler(async (req: Request, res: Response) => {
 
 export const deleteClient = asyncHandler(async (req: Request, res: Response) => {
   await deactivateClient(req.user!.companyId, req.params.id);
-  return sendSuccess(res, { message: 'Client deactivated' });
+  return sendSuccess(res, { success: true });
 });

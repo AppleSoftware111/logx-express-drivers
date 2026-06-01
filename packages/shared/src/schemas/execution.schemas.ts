@@ -24,6 +24,7 @@ export const generateExecutionsSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateFormat')
     .optional(),
+  routeId: z.string().min(1).optional(),
 });
 
 export const gpsPointSchema = z.object({

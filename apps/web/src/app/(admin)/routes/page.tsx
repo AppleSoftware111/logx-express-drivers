@@ -3,18 +3,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Plus, Eye, Power, Pencil, Route as RouteIcon } from 'lucide-react';
+import { ArrowRight, Eye, Power, Pencil, Plus, Route as RouteIcon } from 'lucide-react';
 
-import type { CreateRouteInput, UpdateRouteInput } from '@logx/shared';
-
-import {
-  RouteFormDialog,
-  routeDetailToFormValues,
-} from '@/components/routes/RouteFormDialog';
-import type { RouteFormValues } from '@/components/routes/RouteStopsEditor';
-import type { ClientOption } from '@/components/routes/RouteStopsEditor';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
@@ -22,25 +13,57 @@ import { queryClient } from '@/lib/queryClient';
 
 interface Route {
   _id: string;
+  clientId?: { name: string };
   name: string;
   scheduledTime: string;
   recurrenceType: string;
   daysOfWeek: number[];
+  dayOfMonth?: number;
+  monthOfYear?: number;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   isActive: boolean;
   isTemplate: boolean;
   defaultDriverId?: { name: string };
-  stops: Array<{ _id: string; clientId: { name: string } }>;
+  stops: Array<{ _id: string; clientId: { name: string }; plannedTime?: string }>;
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_LABELS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function formatRecurrence(route: Route) {
+  if (route.recurrenceType === 'WEEKLY' || route.recurrenceType === 'CUSTOM') {
+    return route.daysOfWeek.map((day) => DAY_LABELS[day]).join(', ');
+  }
+
+  if (route.recurrenceType === 'MONTHLY') {
+    return `Monthly on day ${route.dayOfMonth ?? '--'}`;
+  }
+
+  if (route.recurrenceType === 'YEARLY') {
+    return `${MONTH_LABELS[(route.monthOfYear ?? 1) - 1]} ${route.dayOfMonth ?? '--'}`;
+  }
+
+  return route.recurrenceType;
+}
 
 export default function RoutesPage() {
   const t = useTranslations('routes');
-  const router = useRouter();
   const sessionReady = useHasAccessToken();
   const [isActive, setIsActive] = useState<string>('true');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
 
   const { data: routes, isLoading } = useQuery({
     queryKey: ['routes', isActive],
@@ -54,70 +77,6 @@ export default function RoutesPage() {
     },
   });
 
-  const { data: formResources } = useQuery({
-    queryKey: ['route-form-resources'],
-    enabled: sessionReady && dialogOpen,
-    queryFn: async () => {
-      const [clientsRes, driversRes, contractsRes] = await Promise.all([
-        apiClient.get<{ success: boolean; data: ClientOption[] }>('/clients'),
-        apiClient.get<{ success: boolean; data: Array<{ _id: string; name: string }> }>(
-          '/drivers'
-        ),
-        apiClient.get<{
-          success: boolean;
-          data: Array<{
-            _id: string;
-            slaMinutes?: number;
-            clientId?: { name: string };
-          }>;
-        }>('/contracts'),
-      ]);
-      return {
-        clients: clientsRes.data.data,
-        drivers: driversRes.data.data,
-        contracts: contractsRes.data.data,
-      };
-    },
-  });
-
-  const { data: editRoute, isLoading: loadingEditRoute } = useQuery({
-    queryKey: ['route', editingRouteId],
-    enabled: !!editingRouteId && dialogOpen,
-    queryFn: async () => {
-      const res = await apiClient.get(`/routes/${editingRouteId}`);
-      return res.data.data;
-    },
-  });
-
-  const createRoute = useMutation({
-    mutationFn: async (payload: CreateRouteInput) => {
-      const res = await apiClient.post<{ success: boolean; data: { _id: string } }>(
-        '/routes',
-        payload
-      );
-      return res.data.data;
-    },
-    onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: ['routes'] });
-      setDialogOpen(false);
-      setEditingRouteId(null);
-      router.push(`/routes/${data._id}`);
-    },
-  });
-
-  const updateRoute = useMutation({
-    mutationFn: async ({ id, payload }: { id: string; payload: UpdateRouteInput }) => {
-      const res = await apiClient.patch(`/routes/${id}`, payload);
-      return res.data.data;
-    },
-    onSuccess: (_, { id }) => {
-      void queryClient.invalidateQueries({ queryKey: ['routes'] });
-      void queryClient.invalidateQueries({ queryKey: ['route', id] });
-      setDialogOpen(false);
-      setEditingRouteId(null);
-    },
-  });
-
   const toggleActive = useMutation({
     mutationFn: async ({ id, isActive: active }: { id: string; isActive: boolean }) => {
       await apiClient.patch(`/routes/${id}/active`, { isActive: active });
@@ -125,45 +84,22 @@ export default function RoutesPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['routes'] }),
   });
 
-  const openCreate = () => {
-    setEditingRouteId(null);
-    setDialogOpen(true);
-  };
-
-  const openEdit = (routeId: string) => {
-    setEditingRouteId(routeId);
-    setDialogOpen(true);
-  };
-
-  const handleDialogSubmit = (payload: CreateRouteInput | UpdateRouteInput) => {
-    if (editingRouteId) {
-      updateRoute.mutate({ id: editingRouteId, payload });
-    } else {
-      createRoute.mutate(payload as CreateRouteInput);
-    }
-  };
-
-  const editFormInitial: RouteFormValues | null =
-    editingRouteId && editRoute ? routeDetailToFormValues(editRoute) : null;
-
-  const isSubmitting = createRoute.isPending || updateRoute.isPending;
-  const submitError = createRoute.error ?? updateRoute.error;
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage recurring delivery routes</p>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage fixed routes with customer ownership, ordered stops, and recurrence rules.
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+        <Link
+          href="/routes/new"
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
-          New Route
-        </button>
+          New fixed route
+        </Link>
       </div>
 
       <div className="flex items-center gap-3">
@@ -205,18 +141,17 @@ export default function RoutesPage() {
                   <td colSpan={7} className="p-0">
                     <EmptyState
                       Icon={RouteIcon}
-                      title="No routes yet"
-                      description="Create a recurring route with ordered client stops for daily execution."
-                      action={
-                        <button
-                          type="button"
-                          onClick={openCreate}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                      title="No fixed routes yet"
+                      description="Create a recurring route with multiple scheduled stops for each customer workflow."
+                      action={(
+                        <Link
+                          href="/routes/new"
+                          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-700"
                         >
                           <Plus className="w-4 h-4" />
-                          New Route
-                        </button>
-                      }
+                          New fixed route
+                        </Link>
+                      )}
                     />
                   </td>
                 </tr>
@@ -224,7 +159,12 @@ export default function RoutesPage() {
               {routes?.map((route) => (
                 <tr key={route._id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
-                    {route.name}
+                    <div>
+                      <p>{route.name}</p>
+                      <p className="mt-0.5 text-xs font-normal text-gray-500">
+                        {route.clientId?.name ?? 'No customer linked'}
+                      </p>
+                    </div>
                     {route.isTemplate && (
                       <span className="ml-2 text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">
                         Template
@@ -234,11 +174,16 @@ export default function RoutesPage() {
                   <td className="px-5 py-3 text-gray-600">
                     {route.defaultDriverId?.name ?? '—'}
                   </td>
-                  <td className="px-5 py-3 text-gray-600 font-mono">{route.scheduledTime}</td>
+                  <td className="px-5 py-3 text-gray-600 font-mono">
+                    {route.stops[0]?.plannedTime ?? route.scheduledTime}
+                  </td>
                   <td className="px-5 py-3 text-gray-600">
-                    {route.recurrenceType === 'WEEKLY' || route.recurrenceType === 'CUSTOM'
-                      ? route.daysOfWeek.map((d) => DAY_LABELS[d]).join(', ')
-                      : route.recurrenceType}
+                    <div>
+                      <p>{formatRecurrence(route)}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        Starts {route.recurrenceStartDate?.slice(0, 10) ?? 'immediately'}
+                      </p>
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-gray-600">{route.stops.length}</td>
                   <td className="px-5 py-3">
@@ -254,17 +199,16 @@ export default function RoutesPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(route._id)}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                      <Link
+                        href={`/routes/${route._id}/edit`}
+                        className="p-1.5 rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                         title="Edit route"
                       >
                         <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      </Link>
                       <Link
                         href={`/routes/${route._id}`}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                        className="p-1.5 rounded text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                         title="View route"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -280,6 +224,13 @@ export default function RoutesPage() {
                       >
                         <Power className="w-3.5 h-3.5" />
                       </button>
+                      <Link
+                        href={`/routes/${route._id}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-200"
+                      >
+                        Review
+                        <ArrowRight className="h-3 w-3" />
+                      </Link>
                     </div>
                   </td>
                 </tr>
@@ -288,23 +239,6 @@ export default function RoutesPage() {
           </table>
         </div>
       </div>
-
-      <RouteFormDialog
-        open={dialogOpen}
-        onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) setEditingRouteId(null);
-        }}
-        mode={editingRouteId ? 'edit' : 'create'}
-        initial={editFormInitial}
-        loadingInitial={!!editingRouteId && loadingEditRoute}
-        clients={formResources?.clients ?? []}
-        drivers={formResources?.drivers ?? []}
-        contracts={formResources?.contracts ?? []}
-        isSubmitting={isSubmitting}
-        submitError={submitError}
-        onSubmit={handleDialogSubmit}
-      />
     </div>
   );
 }

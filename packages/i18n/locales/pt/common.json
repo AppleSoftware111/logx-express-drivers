@@ -1,5 +1,5 @@
 {
-  "appName": "LOGX Express",
+  "appName": "LOGX BioPoli",
   "save": "Salvar",
   "cancel": "Cancelar",
   "delete": "Excluir",
@@ -46,5 +46,15 @@
   "emptyDescription": "Nada para exibir aqui ainda.",
   "notFoundTitle": "Página não encontrada",
   "notFoundDescription": "O endereço pode estar incorreto ou a página foi removida.",
-  "goHome": "Ir para o painel"
+  "goHome": "Ir para o painel",
+  "pending": "Pendente",
+  "inProgress": "Em andamento",
+  "completed": "Concluído",
+  "details": "Detalhes",
+  "notes": "Observações",
+  "photo": "Foto",
+  "signature": "Assinatura",
+  "receiver": "Recebedor",
+  "from": "De",
+  "to": "Até"
 }

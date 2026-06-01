@@ -1,6 +1,6 @@
 {
-  "delayWhatsApp": "La ruta {routeName} tiene un retraso de {minutes} minutos.",
+  "delayWhatsApp": "⚠️ ALERTA: La ruta *{routeName}* tiene un retraso de *{minutes} minutos*. - LOGX BioPoli",
   "geofenceArrival": "El conductor llegó a la parada {stopName}.",
-  "routeAssigned": "Olá {driverName}! Você tem uma rota atribuída hoje: *{routeName}* com saída às *{time}*. Acesse o app para ver os detalhes. - LOGX Express",
-  "geofenceDriverArrival": "Você chegou em {stopName}"
+  "routeAssigned": "Hola {driverName}. Tienes una ruta asignada hoy: *{routeName}* con salida a las *{time}*. Abre la app para revisar los detalles. - LOGX BioPoli",
+  "geofenceDriverArrival": "Llegaste a {stopName}"
 }

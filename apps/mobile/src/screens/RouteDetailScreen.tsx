@@ -11,7 +11,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { getStopStatusLabel } from '@logx/i18n';
+import { getStopStatusLabel, getRouteStopTypeLabel } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
@@ -68,7 +68,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       setIsTracking(true);
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
     },
-    onError: () => Alert.alert('Error', 'Could not start route'),
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.startRouteFailed')),
   });
 
   const completeRoute = useMutation({
@@ -80,14 +80,14 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       if (onComplete && execution) {
         onComplete({
           executionId,
-          routeName: execution.routeId?.name ?? 'Route',
+          routeName: execution.routeId?.name ?? t('mobile.routeDetail'),
           stops: execution.stops ?? [],
         });
       } else {
         onBack();
       }
     },
-    onError: () => Alert.alert('Error', 'Could not complete route'),
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.completeRouteFailed')),
   });
 
   if (isLoading) {
@@ -118,7 +118,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     return (
       <View style={{ flex: 1 }}>
         <TouchableOpacity style={styles.backButton} onPress={() => setView('route')}>
-          <Text style={styles.backButtonText}>← Back to Route</Text>
+          <Text style={styles.backButtonText}>← {t('mobile.backToRoute')}</Text>
         </TouchableOpacity>
         <StopDetailScreen
           executionId={executionId}
@@ -179,6 +179,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
             <View style={styles.stopInfo}>
               <Text style={styles.stopClient}>{stop.clientId?.name}</Text>
               <Text style={styles.stopAddress} numberOfLines={1}>{stop.address}</Text>
+              <Text style={styles.stopAddress}>{getRouteStopTypeLabel(stop.type, locale)}</Text>
               {stop.waitingTimeMinutes !== undefined && (
                 <Text style={styles.waitingTime}>⏱ {stop.waitingTimeMinutes} min</Text>
               )}

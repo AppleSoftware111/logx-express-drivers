@@ -19,7 +19,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { phone, message } = req.body as { phone: string; message: string };
     await sendWhatsApp(phone, message);
-    return sendSuccess(res, { message: 'Notification sent' });
+    return sendSuccess(res, { success: true });
   })
 );
 

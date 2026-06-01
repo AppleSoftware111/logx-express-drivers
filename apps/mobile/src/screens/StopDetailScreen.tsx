@@ -10,8 +10,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+
+import { formatTimeByLocale, getRouteStopTypeLabel } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
+import { useLocaleStore } from '../stores/localeStore';
 
 interface Stop {
   _id: string;
@@ -35,6 +39,8 @@ interface Props {
 }
 
 export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: Props) {
+  const { t } = useTranslation();
+  const { locale } = useLocaleStore();
   const queryClient = useQueryClient();
 
   const arrived = useMutation({
@@ -44,7 +50,7 @@ export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: P
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
     },
-    onError: () => Alert.alert('Error', 'Could not set arrival. Please try again.'),
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.arrivalFailed')),
   });
 
   const startPickup = useMutation({
@@ -63,42 +69,42 @@ export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: P
 
   const formatTime = (iso?: string) => {
     if (!iso) return '—';
-    return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return formatTimeByLocale(iso, locale);
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.stopNumber}>Stop {stop.order + 1}</Text>
+        <Text style={styles.stopNumber}>{t('mobile.stopDetail')} {stop.order + 1}</Text>
         <Text style={styles.clientName}>{stop.clientId?.name}</Text>
         <Text style={styles.address}>{stop.address}</Text>
 
         <View style={styles.typeBadge}>
-          <Text style={styles.typeText}>{stop.type}</Text>
+          <Text style={styles.typeText}>{getRouteStopTypeLabel(stop.type, locale)}</Text>
         </View>
       </View>
 
       {/* Timeline */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Timeline</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.stopTimeline')}</Text>
         <View style={styles.timeline}>
-          <TimelineRow label="Arrived" time={formatTime(stop.arrivedAt)} done={!!stop.arrivedAt} />
-          <TimelineRow label="Started" time={formatTime(stop.startedAt)} done={!!stop.startedAt} />
-          <TimelineRow label="Completed" time={formatTime(stop.completedAt)} done={!!stop.completedAt} />
+          <TimelineRow label={t('mobile.arrived')} time={formatTime(stop.arrivedAt)} done={!!stop.arrivedAt} />
+          <TimelineRow label={t('mobile.started')} time={formatTime(stop.startedAt)} done={!!stop.startedAt} />
+          <TimelineRow label={t('mobile.completedLabel')} time={formatTime(stop.completedAt)} done={!!stop.completedAt} />
         </View>
         {stop.waitingTimeMinutes !== undefined && stop.waitingTimeMinutes > 0 && (
           <View style={styles.waitingBadge}>
-            <Text style={styles.waitingText}>⏱ Waiting time: {stop.waitingTimeMinutes} min</Text>
+            <Text style={styles.waitingText}>⏱ {t('executions.waitingTime')}: {stop.waitingTimeMinutes} min</Text>
           </View>
         )}
       </View>
 
       {/* Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Actions</Text>
+        <Text style={styles.sectionTitle}>{t('mobile.actions')}</Text>
 
         <TouchableOpacity style={styles.actionButton} onPress={openMaps}>
-          <Text style={styles.actionButtonText}>🗺 Navigate</Text>
+          <Text style={styles.actionButtonText}>🗺 {t('mobile.navigate')}</Text>
         </TouchableOpacity>
 
         {stop.status === 'PENDING' && (
@@ -110,7 +116,7 @@ export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: P
             {arrived.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>📍 Mark Arrived</Text>
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>📍 {t('mobile.markArrived')}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -124,7 +130,9 @@ export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: P
             {startPickup.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>▶ Start {stop.type === 'DELIVERY' ? 'Delivery' : 'Pickup'}</Text>
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
+                ▶ {stop.type === 'DELIVERY' ? t('mobile.startDelivery') : t('mobile.startPickup')}
+              </Text>
             )}
           </TouchableOpacity>
         )}
@@ -135,7 +143,7 @@ export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: P
             onPress={onOpenPOD}
           >
             <Text style={[styles.actionButtonText, { color: '#fff' }]}>
-              ✅ Complete & Capture POD
+              ✅ {t('mobile.completeCapturePod')}
             </Text>
           </TouchableOpacity>
         )}

@@ -26,7 +26,8 @@ router.get(
       req.user!.companyId,
       { isRead },
       page,
-      limit
+      limit,
+      req.locale
     );
     return sendPaginated(res, alerts, buildMeta(page, limit, total));
   })
@@ -44,7 +45,7 @@ router.patch(
   '/read-all',
   asyncHandler(async (req: Request, res: Response) => {
     await markAllAlertsRead(req.user!.companyId);
-    return sendSuccess(res, { message: 'All alerts marked as read' });
+    return sendSuccess(res, { success: true });
   })
 );
 

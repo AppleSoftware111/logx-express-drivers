@@ -1,7 +1,7 @@
 {
-  "name": "LOGX Express",
-  "short_name": "LOGX",
-  "description": "Healthcare logistics for hospital and laboratory courier operations",
+  "name": "LOGX BioPoli",
+  "short_name": "BioPoli",
+  "description": "Healthcare logistics for recurring collection and delivery operations",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
+import type { SupportedLocale } from '@logx/i18n';
 import type { UserRole } from '@logx/shared';
 
 export interface IRefreshToken {
@@ -14,6 +15,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   role: UserRole;
+  locale: SupportedLocale;
   refreshTokens: IRefreshToken[];
   isActive: boolean;
   createdAt: Date;
@@ -39,6 +41,11 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'CLIENT', 'DRIVER'],
       required: true,
+    },
+    locale: {
+      type: String,
+      enum: ['pt', 'es', 'en'],
+      default: 'pt',
     },
     refreshTokens: { type: [refreshTokenSchema], default: [] },
     isActive: { type: Boolean, default: true },

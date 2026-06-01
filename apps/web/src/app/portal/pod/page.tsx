@@ -1,17 +1,22 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle, FileImage, MapPin, User } from 'lucide-react';
+import { CheckCircle, FileImage, User } from 'lucide-react';
+
+import type { SupportedLocale } from '@logx/i18n';
 
 import { apiClient } from '@/lib/api';
 import { formatDateTime } from '@/lib/utils';
 
 function PODContent() {
   const t = useTranslations('portal');
+  const tCommon = useTranslations('common');
+  const tExecutions = useTranslations('executions');
+  const locale = useLocale() as SupportedLocale;
   const searchParams = useSearchParams();
   const executionId = searchParams.get('executionId');
 
@@ -27,7 +32,7 @@ function PODContent() {
   if (!executionId) {
     return (
       <div className="text-center py-16 text-gray-400">
-        <p>Select a delivery from the history page to view POD</p>
+        <p>{t('selectDelivery')}</p>
       </div>
     );
   }
@@ -52,7 +57,7 @@ function PODContent() {
         <p className="text-sm text-gray-500 mt-1">
           {execution?.routeId?.name} ·{' '}
           {execution?.scheduledDate
-            ? new Date(execution.scheduledDate).toLocaleDateString('pt-BR')
+            ? formatDateTime(`${execution.scheduledDate}T00:00:00`, locale)
             : ''}
         </p>
       </div>
@@ -60,7 +65,7 @@ function PODContent() {
       {completedStops?.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           <FileImage className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p>No POD documents available yet</p>
+          <p>{t('noPodYet')}</p>
         </div>
       )}
 
@@ -85,7 +90,7 @@ function PODContent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-gray-900">{stop.clientId?.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Stop {stop.order + 1} · {stop.address}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{t('stopLabel', { order: stop.order + 1 })} · {stop.address}</p>
                 </div>
                 <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
@@ -95,25 +100,25 @@ function PODContent() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {stop.arrivedAt && (
                   <div>
-                    <p className="text-xs text-gray-400">Arrived</p>
-                    <p className="text-gray-700">{formatDateTime(stop.arrivedAt)}</p>
+                    <p className="text-xs text-gray-400">{t('arrived')}</p>
+                    <p className="text-gray-700">{formatDateTime(stop.arrivedAt, locale)}</p>
                   </div>
                 )}
                 {stop.completedAt && (
                   <div>
-                    <p className="text-xs text-gray-400">Completed</p>
-                    <p className="text-gray-700">{formatDateTime(stop.completedAt)}</p>
+                    <p className="text-xs text-gray-400">{t('completedLabel')}</p>
+                    <p className="text-gray-700">{formatDateTime(stop.completedAt, locale)}</p>
                   </div>
                 )}
                 {stop.waitingTimeMinutes !== undefined && (
                   <div>
-                    <p className="text-xs text-gray-400">Waiting time</p>
+                    <p className="text-xs text-gray-400">{tExecutions('waitingTime')}</p>
                     <p className="font-medium text-blue-600">{stop.waitingTimeMinutes} min</p>
                   </div>
                 )}
                 {stop.receiverName && (
                   <div>
-                    <p className="text-xs text-gray-400">Receiver</p>
+                    <p className="text-xs text-gray-400">{t('receiverLabel')}</p>
                     <p className="text-gray-700 flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {stop.receiverName}
@@ -124,7 +129,7 @@ function PODContent() {
 
               {stop.deliveryNotes && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">Notes</p>
+                  <p className="text-xs text-gray-400 mb-1">{t('notesLabel')}</p>
                   <p className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded">{stop.deliveryNotes}</p>
                 </div>
               )}
@@ -132,18 +137,18 @@ function PODContent() {
               <div className="grid grid-cols-2 gap-3">
                 {stop.podPhoto && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Photo</p>
+                    <p className="text-xs text-gray-400 mb-1">{tCommon('photo')}</p>
                     <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
                       <FileImage className="w-6 h-6 text-gray-300" />
-                      <span className="text-xs text-gray-400 ml-2">View Photo</span>
+                      <span className="text-xs text-gray-400 ml-2">{t('viewPhoto')}</span>
                     </div>
                   </div>
                 )}
                 {stop.podSignature && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">Signature</p>
+                    <p className="text-xs text-gray-400 mb-1">{tCommon('signature')}</p>
                     <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                      <span className="text-xs text-gray-400">View Signature</span>
+                      <span className="text-xs text-gray-400">{t('viewSignature')}</span>
                     </div>
                   </div>
                 )}

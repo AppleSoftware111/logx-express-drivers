@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-import { DEFAULT_LOCALE, getNestedMessage, type SupportedLocale } from '@logx/i18n';
+import { DEFAULT_LOCALE, formatMessage, type SupportedLocale } from '@logx/i18n';
 
 import { env } from '../../config/env';
 
@@ -59,14 +59,7 @@ function formatTemplate(
   key: string,
   params: Record<string, string | number>
 ): string {
-  const template =
-    getNestedMessage(locale, 'notifications', key) ??
-    getNestedMessage(DEFAULT_LOCALE, 'notifications', key) ??
-    '';
-  return Object.entries(params).reduce(
-    (msg, [k, v]) => msg.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
-    template
-  );
+  return formatMessage(locale, 'notifications', key, params);
 }
 
 export function buildRouteAssignedMessage(

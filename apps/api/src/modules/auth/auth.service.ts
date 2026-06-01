@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-import { ApiErrorCode } from '@logx/i18n';
+import { ApiErrorCode, type SupportedLocale } from '@logx/i18n';
 import { BCRYPT_ROUNDS } from '@logx/shared';
 
 import { AppError } from '../../middleware/errorHandler';
@@ -22,13 +22,18 @@ export interface LoginResult extends AuthTokens {
     id: string;
     email: string;
     role: string;
+    locale: SupportedLocale;
     companyId?: string;
     driverId?: string;
     clientId?: string;
   };
 }
 
-export async function loginService(email: string, password: string): Promise<LoginResult> {
+export async function loginService(
+  email: string,
+  password: string,
+  locale?: SupportedLocale
+): Promise<LoginResult> {
   const user = await User.findOne({ email: email.toLowerCase() }).select(
     '+passwordHash +refreshTokens'
   );
@@ -58,7 +63,12 @@ export async function loginService(email: string, password: string): Promise<Log
   const validTokens = user.refreshTokens.filter((t) => t.expiresAt > now);
   validTokens.push({ token: refreshToken, expiresAt: getRefreshTokenExpiry() });
 
-  await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: validTokens } });
+  await User.findByIdAndUpdate(user._id, {
+    $set: {
+      refreshTokens: validTokens,
+      ...(locale ? { locale } : {}),
+    },
+  });
 
   return {
     accessToken,
@@ -67,6 +77,7 @@ export async function loginService(email: string, password: string): Promise<Log
       id: user._id.toString(),
       email: user.email,
       role: user.role,
+      locale: locale ?? user.locale,
       companyId: user.companyId?.toString(),
       driverId: user.driverId?.toString(),
       clientId: user.clientId?.toString(),
@@ -74,7 +85,10 @@ export async function loginService(email: string, password: string): Promise<Log
   };
 }
 
-export async function refreshTokenService(refreshToken: string): Promise<AuthTokens> {
+export async function refreshTokenService(
+  refreshToken: string,
+  locale?: SupportedLocale
+): Promise<AuthTokens> {
   const payload = verifyRefreshToken(refreshToken);
   if (!payload) {
     throw new AppError(ApiErrorCode.AUTH_REFRESH_INVALID, 401);
@@ -112,7 +126,12 @@ export async function refreshTokenService(refreshToken: string): Promise<AuthTok
     .filter((t) => t.token !== refreshToken && t.expiresAt > now)
     .concat({ token: newRefreshToken, expiresAt: getRefreshTokenExpiry() });
 
-  await User.findByIdAndUpdate(user._id, { $set: { refreshTokens: updatedTokens } });
+  await User.findByIdAndUpdate(user._id, {
+    $set: {
+      refreshTokens: updatedTokens,
+      ...(locale ? { locale } : {}),
+    },
+  });
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }

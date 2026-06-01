@@ -24,6 +24,7 @@ const envSchema = z.object({
 
   FRONTEND_URL: z.string().min(1, 'FRONTEND_URL is required'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
+  APP_TIMEZONE: z.string().default('America/Sao_Paulo'),
 
   WHATSAPP_PROVIDER: z.enum(['zapi', 'twilio']).optional(),
   ZAPI_INSTANCE_ID: z.string().optional(),

@@ -1,5 +1,5 @@
 /**
- * Generates static favicon assets from public/favicon.svg (favicon.io-style set).
+ * Generates static favicon assets from public/favicon.svg.
  * Run: node scripts/generate-favicons.mjs
  */
 import fs from 'fs';
@@ -47,9 +47,9 @@ fs.writeFileSync(icoPublic, ico);
 console.log('Wrote favicon.ico');
 
 const manifest = {
-  name: 'LOGX Express',
-  short_name: 'LOGX',
-  description: 'Healthcare logistics for hospital and laboratory courier operations',
+  name: 'LOGX BioPoli',
+  short_name: 'BioPoli',
+  description: 'Healthcare logistics for recurring collection and delivery operations',
   icons: [
     { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
     { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },

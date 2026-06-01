@@ -1,16 +1,22 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+
+import { getExecutionStatusLabel, type SupportedLocale } from '@logx/i18n';
 
 import { apiClient } from '@/lib/api';
 import { formatDateTime, getStatusColor } from '@/lib/utils';
 
 export default function PortalDeliveriesPage() {
   const t = useTranslations('portal');
+  const tCommon = useTranslations('common');
+  const tExecutions = useTranslations('executions');
+  const tRoutes = useTranslations('routes');
+  const locale = useLocale() as SupportedLocale;
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -32,7 +38,7 @@ export default function PortalDeliveriesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{t('deliveryHistory')}</h1>
-        <p className="text-sm text-gray-500 mt-1">Review past deliveries and proof of delivery</p>
+        <p className="text-sm text-gray-500 mt-1">{t('reviewPastDeliveries')}</p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -42,7 +48,7 @@ export default function PortalDeliveriesPage() {
           onChange={(e) => setStartDate(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
         />
-        <span className="text-gray-400">to</span>
+        <span className="text-gray-400">{tCommon('to').toLowerCase()}</span>
         <input
           type="date"
           value={endDate}
@@ -56,19 +62,19 @@ export default function PortalDeliveriesPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 text-left">Route</th>
-                <th className="px-5 py-3 text-left">Date</th>
-                <th className="px-5 py-3 text-left">Driver</th>
-                <th className="px-5 py-3 text-left">Stops</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-left">Details</th>
+                <th className="px-5 py-3 text-left">{tExecutions('routeColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('dateColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('driverColumn')}</th>
+                <th className="px-5 py-3 text-left">{tRoutes('stops')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('statusColumn')}</th>
+                <th className="px-5 py-3 text-left">{tCommon('details')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading && (
                 <tr>
                   <td colSpan={6} className="px-5 py-8 text-center text-gray-400">
-                    Loading…
+                    {tExecutions('loading')}
                   </td>
                 </tr>
               )}
@@ -84,7 +90,7 @@ export default function PortalDeliveriesPage() {
                 <tr key={exec._id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">{exec.routeId?.name}</td>
                   <td className="px-5 py-3 text-gray-600">
-                    {new Date(exec.scheduledDate).toLocaleDateString('pt-BR')} {exec.scheduledTime}
+                    {formatDateTime(`${exec.scheduledDate}T${exec.scheduledTime}:00`, locale)}
                   </td>
                   <td className="px-5 py-3 text-gray-600">{exec.driverId?.name}</td>
                   <td className="px-5 py-3 text-gray-600">
@@ -92,12 +98,12 @@ export default function PortalDeliveriesPage() {
                   </td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(exec.status)}`}>
-                      {exec.status}
+                      {getExecutionStatusLabel(exec.status, locale)}
                     </span>
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/portal/pod?executionId=${exec._id}`} className="text-blue-600 hover:underline text-xs">
-                      View POD →
+                      {t('viewPod')} →
                     </Link>
                   </td>
                 </tr>

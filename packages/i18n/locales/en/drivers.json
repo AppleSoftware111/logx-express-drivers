@@ -20,14 +20,14 @@
     "vehicleType": "Vehicle type",
     "active": "Active driver"
   },
-  "onlineOnly": "Apenas motoristas online",
-  "driverCount": "{count, plural, one {# motorista} other {# motoristas}}",
-  "noDriversYet": "Nenhum motorista ainda",
-  "noDriversDesc": "Adicione o primeiro motorista para atribuir rotas e acompanhar entregas.",
-  "noPhone": "Sem telefone",
-  "license": "CNH",
-  "lastSeen": "Visto por último",
-  "setOffline": "Marcar offline",
-  "setOnline": "Marcar online",
-  "editTitle": "Editar motorista"
+  "onlineOnly": "Only online drivers",
+  "driverCount": "{count, plural, one {# driver} other {# drivers}}",
+  "noDriversYet": "No drivers yet",
+  "noDriversDesc": "Add the first driver to assign routes and track deliveries.",
+  "noPhone": "No phone",
+  "license": "License",
+  "lastSeen": "Last seen",
+  "setOffline": "Set offline",
+  "setOnline": "Set online",
+  "editTitle": "Edit driver"
 }

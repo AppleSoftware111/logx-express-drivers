@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, Clock, Truck, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -14,7 +14,6 @@ import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
 import { queryClient } from '@/lib/queryClient';
 import type { SupportedLocale } from '@logx/i18n';
-import { getExecutionStatusLabel } from '@logx/i18n';
 
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
@@ -65,7 +64,7 @@ export default function DashboardPage() {
   const { socket } = useSocket();
   const hasToken = useHasAccessToken();
   const t = useTranslations('dashboard');
-  const tCommon = useTranslations('common');
+  const tExecutions = useTranslations('executions');
   const locale = useLocale() as SupportedLocale;
 
   const { data, isLoading } = useQuery({
@@ -212,7 +211,7 @@ export default function DashboardPage() {
           </div>
           <div className="divide-y divide-gray-50">
             {data?.recentAlerts.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No alerts</p>
+              <p className="text-sm text-gray-400 text-center py-8">{t('noAlerts')}</p>
             )}
             {data?.recentAlerts.map((alert) => (
               <div key={alert._id} className="px-5 py-3">
@@ -222,7 +221,7 @@ export default function DashboardPage() {
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900 line-clamp-2">{alert.message}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(alert.createdAt)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(alert.createdAt, locale)}</p>
                   </div>
                 </div>
               </div>
@@ -234,17 +233,17 @@ export default function DashboardPage() {
       {/* Active Executions Table */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Active Routes Today</h2>
+          <h2 className="font-semibold text-gray-900">{t('activeExecutions')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 text-left">Route</th>
-                <th className="px-5 py-3 text-left">Driver</th>
-                <th className="px-5 py-3 text-left">Scheduled</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-left">Delay</th>
+                <th className="px-5 py-3 text-left">{tExecutions('routeColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('driverColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('scheduledColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('statusColumn')}</th>
+                <th className="px-5 py-3 text-left">{tExecutions('delayColumn')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -282,7 +281,7 @@ export default function DashboardPage() {
                         {getDelayLabel(exec.delayMinutes, locale)}
                       </span>
                     ) : (
-                      <span className="text-green-600 text-xs">On time</span>
+                      <span className="text-green-600 text-xs">{tExecutions('onTime')}</span>
                     )}
                   </td>
                 </tr>

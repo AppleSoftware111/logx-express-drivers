@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Map, AdvancedMarker, Pin, Polyline } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
@@ -54,7 +54,7 @@ export default function PortalTrackingPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{t('trackingTitle')}</h1>
-        <p className="text-sm text-gray-500 mt-1">Real-time driver location for your deliveries</p>
+        <p className="text-sm text-gray-500 mt-1">{t('realTimeDriverLocation')}</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -64,18 +64,20 @@ export default function PortalTrackingPage() {
               <>
                 <p className="font-medium text-gray-900">{activeExecution.routeId?.name}</p>
                 <p className="text-xs text-gray-400">
-                  Driver: {activeExecution.driverId?.name} ·{' '}
-                  {activeExecution.stops?.filter((s: { status: string }) => s.status === 'COMPLETED').length}/
-                  {activeExecution.stops?.length} stops completed
+                  {t('driverLabel')}: {activeExecution.driverId?.name} ·{' '}
+                  {t('stopsCompleted', {
+                    completed: activeExecution.stops?.filter((s: { status: string }) => s.status === 'COMPLETED').length,
+                    total: activeExecution.stops?.length,
+                  })}
                 </p>
               </>
             ) : (
-              <p className="text-sm text-gray-500">No active route right now</p>
+              <p className="text-sm text-gray-500">{t('noActiveRoute')}</p>
             )}
           </div>
           <div className={`flex items-center gap-2 text-xs ${livePos ? 'text-green-600' : 'text-gray-400'}`}>
             <div className={`w-2 h-2 rounded-full ${livePos ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-            {livePos ? 'Live' : 'Offline'}
+            {livePos ? t('live') : t('offline')}
           </div>
         </div>
         <div className="h-[500px]">

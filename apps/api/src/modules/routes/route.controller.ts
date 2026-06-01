@@ -50,7 +50,7 @@ export const patchRouteActive = asyncHandler(async (req: Request, res: Response)
 
 export const deleteRouteController = asyncHandler(async (req: Request, res: Response) => {
   await deleteRoute(req.user!.companyId, req.params.id);
-  return sendSuccess(res, { message: 'Route deactivated' });
+  return sendSuccess(res, { success: true });
 });
 
 export const getRouteSchedulePreview = asyncHandler(async (req: Request, res: Response) => {

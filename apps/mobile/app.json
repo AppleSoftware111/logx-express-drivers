@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "LOGX Express",
-    "slug": "logx-express-driver",
+    "name": "LOGX BioPoli",
+    "slug": "logx-biopoli-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,11 +14,11 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.logxexpress.driver",
+      "bundleIdentifier": "com.logxbiopoli.driver",
       "infoPlist": {
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "LOGX Express needs location access to track your route and record stops.",
-        "NSLocationWhenInUseUsageDescription": "LOGX Express needs location access to show your position on the map.",
-        "NSCameraUsageDescription": "LOGX Express needs camera access to capture proof of delivery photos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "LOGX BioPoli needs location access to track your route and record stops.",
+        "NSLocationWhenInUseUsageDescription": "LOGX BioPoli needs location access to show your position on the map.",
+        "NSCameraUsageDescription": "LOGX BioPoli needs camera access to capture proof of delivery photos.",
         "NSMicrophoneUsageDescription": "Camera access requires microphone permission."
       }
     },
@@ -27,7 +27,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1d4ed8"
       },
-      "package": "com.logxexpress.driver",
+      "package": "com.logxbiopoli.driver",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -41,18 +41,18 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "LOGX Express needs location access to track your route.",
+          "locationAlwaysAndWhenInUsePermission": "LOGX BioPoli needs location access to track your route.",
           "isAndroidBackgroundLocationEnabled": true
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "LOGX Express needs camera access to capture proof of delivery photos."
+          "cameraPermission": "LOGX BioPoli needs camera access to capture proof of delivery photos."
         }
       ]
     ],
-    "scheme": "logxexpress",
+    "scheme": "logxbiopoli",
     "extra": {}
   }
 }

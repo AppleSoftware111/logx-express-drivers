@@ -1,18 +1,20 @@
 import cron from 'node-cron';
 
+import { env } from '../config/env';
 import { AlertType } from '@logx/shared';
 
 import { Alert } from '../models/Alert.model';
-import { Route } from '../models/Route.model';
 import { RouteExecution } from '../models/RouteExecution.model';
 import { Driver } from '../models/Driver.model';
+import { User } from '../models/User.model';
 import { alertAlreadyExists, createAlert } from '../modules/alerts/alert.service';
 import {
   buildDelayAlertMessage,
   sendWhatsApp,
 } from '../modules/notifications/notification.service';
 import { getIO } from '../socket';
-import { calcDelayMinutes } from '../utils/timeCalc';
+import { invalidateCache } from '../utils/cache';
+import { calcDelayMinutes, getCurrentBusinessDate } from '../utils/timeCalc';
 
 const DELAY_THRESHOLDS: { minutes: number; type: AlertType }[] = [
   { minutes: 15, type: AlertType.DELAY_15 },
@@ -21,39 +23,50 @@ const DELAY_THRESHOLDS: { minutes: number; type: AlertType }[] = [
 ];
 
 export function startDelayCheckerJob(): void {
-  cron.schedule('*/5 * * * *', async () => {
-    try {
-      await checkDelays();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[job:delayChecker] Error:', msg);
-    }
-  });
+  cron.schedule(
+    '*/5 * * * *',
+    async () => {
+      try {
+        await checkDelays();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[job:delayChecker] Error:', msg);
+      }
+    },
+    { timezone: env.APP_TIMEZONE }
+  );
 
-  console.info('[job:delayChecker] Scheduled every 5 minutes');
+  console.info(`[job:delayChecker] Scheduled every 5 minutes (${env.APP_TIMEZONE})`);
 }
 
 async function checkDelays(): Promise<void> {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const today = getCurrentBusinessDate();
 
   const pendingExecutions = await RouteExecution.find({
     scheduledDate: today,
-    status: { $in: ['PENDING', 'ASSIGNED', 'ACCEPTED'] },
+    status: { $nin: ['COMPLETED', 'CANCELLED'] },
   })
-    .select('companyId routeId driverId scheduledDate scheduledTime status delayMinutes')
+    .select('companyId routeId driverId scheduledDate scheduledTime status delayMinutes actualStartTime')
     .populate('routeId', 'name')
     .lean();
 
+  const touchedCompanies = new Set<string>();
+
   for (const execution of pendingExecutions) {
-    const delayMinutes = calcDelayMinutes(execution.scheduledDate, execution.scheduledTime);
+    const delayMinutes = calcDelayMinutes(
+      execution.scheduledDate,
+      execution.scheduledTime,
+      execution.actualStartTime ?? new Date()
+    );
+
+    if (delayMinutes !== execution.delayMinutes) {
+      await RouteExecution.findByIdAndUpdate(execution._id, {
+        $set: { delayMinutes },
+      });
+      touchedCompanies.add(execution.companyId.toString());
+    }
 
     if (delayMinutes === 0) continue;
-
-    // Update delayMinutes in DB
-    await RouteExecution.findByIdAndUpdate(execution._id, {
-      $set: { delayMinutes },
-    });
 
     const routeName =
       (execution.routeId as { name?: string })?.name ?? String(execution.routeId);
@@ -70,7 +83,9 @@ async function checkDelays(): Promise<void> {
         companyId,
         execution._id.toString(),
         threshold.type,
-        message
+        message,
+        'delayWhatsApp',
+        { routeName, minutes: delayMinutes }
       );
 
       // Real-time socket broadcast
@@ -86,11 +101,23 @@ async function checkDelays(): Promise<void> {
       try {
         const driver = await Driver.findById(execution.driverId).select('phone name').lean();
         if (driver?.phone) {
-          await sendWhatsApp(driver.phone, message);
+          const driverUser = await User.findOne({ driverId: execution.driverId })
+            .select('locale')
+            .lean();
+          await sendWhatsApp(
+            driver.phone,
+            buildDelayAlertMessage(routeName, delayMinutes, driverUser?.locale ?? 'pt')
+          );
         }
       } catch {
         // Non-critical
       }
     }
   }
+
+  await Promise.all(
+    [...touchedCompanies].map((companyId) =>
+      invalidateCache(`dashboard:summary:${companyId}:*`)
+    )
+  );
 }

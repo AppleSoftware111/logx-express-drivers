@@ -19,7 +19,8 @@
     "clean": "rimraf dist",
     "type-check": "tsc --noEmit",
     "check-keys": "node scripts/check-keys.mjs",
-    "test": "npm run build && node scripts/test-i18n.mjs"
+    "check-quality": "node scripts/check-quality.mjs",
+    "test": "npm run build && npm run check-keys && npm run check-quality && node scripts/test-i18n.mjs"
   },
   "dependencies": {
     "zod": "^3.23.8"

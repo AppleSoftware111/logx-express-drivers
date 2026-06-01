@@ -11,9 +11,9 @@
   "onRoute": "En ruta",
   "idle": "Inactivo",
   "delayed": "Retrasado",
-  "unreadAlerts": "Alertas não lidos",
-  "liveDriverLocations": "Localização dos motoristas",
-  "recentAlerts": "Alertas recentes",
-  "activeExecutions": "Execuções ativas",
-  "noActiveExecutions": "Nenhuma execução ativa no momento"
+  "unreadAlerts": "Alertas no leídos",
+  "liveDriverLocations": "Ubicación de los conductores",
+  "recentAlerts": "Alertas recientes",
+  "activeExecutions": "Ejecuciones activas",
+  "noActiveExecutions": "No hay ejecuciones activas en este momento"
 }

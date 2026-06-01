@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Loader2, Truck } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { loginSchema, type LoginInput } from '@logx/shared';
@@ -37,10 +37,10 @@ export function LoginForm() {
       </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-xl mb-4">
-            <Truck className="w-8 h-8 text-blue-600" />
+          <div className="mx-auto mb-5 flex max-w-[280px] items-center justify-center rounded-3xl bg-white/95 p-4 shadow-2xl">
+            <img src="/logo-biopoli.svg" alt={tCommon('appName')} className="h-16 w-auto rounded-2xl" />
           </div>
-          <h1 className="text-3xl font-bold text-white">{tCommon('appName')}</h1>
+          <h1 className="text-3xl font-bold text-white">LOGX BioPoli</h1>
           <p className="text-blue-200 mt-1 text-sm">{t('signInSubtitle')}</p>
         </div>
 

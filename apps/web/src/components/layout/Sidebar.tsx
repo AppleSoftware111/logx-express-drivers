@@ -47,11 +47,10 @@ export function Sidebar() {
 
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-gray-900 text-white shrink-0">
-      <div className="flex items-center gap-3 px-6 h-16 border-b border-gray-800">
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <Truck className="w-4 h-4" />
+      <div className="border-b border-gray-800 px-4 py-4">
+        <div className="rounded-2xl bg-white/95 p-3 shadow-lg">
+          <img src="/logo-biopoli.svg" alt={tCommon('appName')} className="h-12 w-full rounded-xl object-contain" />
         </div>
-        <span className="font-bold text-lg tracking-tight">{tCommon('appName')}</span>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5">

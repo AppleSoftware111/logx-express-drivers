@@ -7,6 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../services/api';
 
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const completeMutation = useMutation({
@@ -50,7 +52,7 @@ export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: P
         <View style={styles.checkCircle}>
           <Text style={styles.checkMark}>✓</Text>
         </View>
-        <Text style={styles.title}>Route Summary</Text>
+        <Text style={styles.title}>{t('mobile.routeSummary')}</Text>
         <Text style={styles.routeName}>{routeName}</Text>
       </View>
 
@@ -58,20 +60,20 @@ export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: P
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{completedCount}</Text>
-          <Text style={styles.statLabel}>Completed</Text>
+          <Text style={styles.statLabel}>{t('common.completed')}</Text>
         </View>
         <View style={[styles.statCard, styles.statCardMiddle]}>
           <Text style={[styles.statValue, styles.statWarning]}>{skippedCount}</Text>
-          <Text style={styles.statLabel}>Skipped</Text>
+          <Text style={styles.statLabel}>{t('mobile.skipped')}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{totalWaiting}</Text>
-          <Text style={styles.statLabel}>Total Wait (min)</Text>
+          <Text style={styles.statLabel}>{t('mobile.totalWait')}</Text>
         </View>
       </View>
 
       {/* Stop list */}
-      <Text style={styles.sectionTitle}>Stops</Text>
+      <Text style={styles.sectionTitle}>{t('mobile.stops')}</Text>
       {stops.map((stop) => {
         const isCompleted = stop.status === 'COMPLETED';
         const isSkipped = stop.status === 'SKIPPED';
@@ -109,12 +111,12 @@ export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: P
         activeOpacity={0.8}
       >
         <Text style={styles.completeBtnText}>
-          {completeMutation.isPending ? 'Saving…' : 'Finish Route'}
+          {completeMutation.isPending ? t('mobile.saving') : t('mobile.finishRoute')}
         </Text>
       </TouchableOpacity>
 
       {completeMutation.isError && (
-        <Text style={styles.errorText}>Failed to complete route. Please try again.</Text>
+        <Text style={styles.errorText}>{t('mobile.completeRouteFailed')}</Text>
       )}
     </ScrollView>
   );

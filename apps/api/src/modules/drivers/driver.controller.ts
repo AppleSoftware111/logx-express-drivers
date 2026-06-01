@@ -41,5 +41,5 @@ export const patchDriverOnlineStatus = asyncHandler(async (req: Request, res: Re
 
 export const deleteDriver = asyncHandler(async (req: Request, res: Response) => {
   await deactivateDriver(req.user!.companyId, req.params.id);
-  return sendSuccess(res, { message: 'Driver deactivated' });
+  return sendSuccess(res, { success: true });
 });

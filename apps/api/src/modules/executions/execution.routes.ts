@@ -3,6 +3,7 @@ import { Router } from 'express';
 import {
   UserRole,
   completeStopSchema,
+  generateExecutionsSchema,
   substituteDriverSchema,
   updateExecutionStatusSchema,
 } from '@logx/shared';
@@ -17,6 +18,7 @@ import {
   getSingleExecution,
   getTodayExecutionsController,
   patchExecutionStatus,
+  postGenerateExecutions,
   postStopArrived,
   postStopComplete,
   postStopInProgress,
@@ -33,9 +35,16 @@ router.get('/today', getTodayExecutionsController);
 router.get('/:id', getSingleExecution);
 router.get('/:id/gps-track', getGpsTrack);
 router.get('/:id/alerts', getExecutionAlertsController);
+router.post(
+  '/generate',
+  requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),
+  validateBody(generateExecutionsSchema),
+  postGenerateExecutions
+);
 
 router.patch(
   '/:id/status',
+  requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),
   validateBody(updateExecutionStatusSchema),
   patchExecutionStatus
 );

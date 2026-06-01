@@ -2,11 +2,17 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 
 import type { AlertType } from '@logx/shared';
 
+export interface IAlertMessageParams {
+  [key: string]: string | number;
+}
+
 export interface IAlert extends Document {
   companyId: Types.ObjectId;
   executionId?: Types.ObjectId;
   type: AlertType;
   message: string;
+  messageKey?: string;
+  messageParams?: IAlertMessageParams;
   isRead: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -22,6 +28,8 @@ const alertSchema = new Schema<IAlert>(
       required: true,
     },
     message: { type: String, required: true, trim: true },
+    messageKey: { type: String, default: null },
+    messageParams: { type: Schema.Types.Mixed, default: null },
     isRead: { type: Boolean, default: false },
   },
   {

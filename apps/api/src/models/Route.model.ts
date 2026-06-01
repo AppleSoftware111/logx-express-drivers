@@ -7,17 +7,24 @@ export interface IRouteStop {
   order: number;
   address: string;
   location: { lat: number; lng: number };
+  plannedTime: string;
   expectedDurationMinutes: number;
   type: RouteStopType;
+  instructions?: string;
 }
 
 export interface IRoute extends Document {
   companyId: Types.ObjectId;
+  clientId?: Types.ObjectId;
   contractId?: Types.ObjectId;
   name: string;
   description?: string;
   recurrenceType: RecurrenceType;
   daysOfWeek: number[];
+  dayOfMonth?: number;
+  monthOfYear?: number;
+  recurrenceStartDate?: Date;
+  recurrenceEndDate?: Date;
   scheduledTime: string;
   isActive: boolean;
   isTemplate: boolean;
@@ -36,8 +43,14 @@ const routeStopSchema = new Schema<IRouteStop>(
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
     },
+    plannedTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
     expectedDurationMinutes: { type: Number, default: 15 },
     type: { type: String, enum: ['PICKUP', 'DELIVERY', 'BOTH'], required: true },
+    instructions: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -45,15 +58,20 @@ const routeStopSchema = new Schema<IRouteStop>(
 const routeSchema = new Schema<IRoute>(
   {
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+    clientId: { type: Schema.Types.ObjectId, ref: 'Client' },
     contractId: { type: Schema.Types.ObjectId, ref: 'Contract' },
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     recurrenceType: {
       type: String,
-      enum: ['DAILY', 'WEEKLY', 'MONTHLY', 'CUSTOM'],
+      enum: ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM'],
       required: true,
     },
     daysOfWeek: { type: [Number], default: [] },
+    dayOfMonth: { type: Number, min: 1, max: 31 },
+    monthOfYear: { type: Number, min: 1, max: 12 },
+    recurrenceStartDate: { type: Date },
+    recurrenceEndDate: { type: Date },
     scheduledTime: {
       type: String,
       required: true,

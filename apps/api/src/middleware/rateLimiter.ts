@@ -1,44 +1,25 @@
-import { ApiErrorCode } from '@logx/i18n';
+import { ApiErrorCode, getApiErrorMessage } from '@logx/i18n';
 import rateLimit from 'express-rate-limit';
 
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      code: ApiErrorCode.RATE_LIMITED,
-      message: 'Too many requests, please try again after 15 minutes',
+function buildLimiter(windowMs: number, max: number) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      const locale = req.locale ?? 'pt';
+      res.status(429).json({
+        success: false,
+        error: {
+          code: ApiErrorCode.RATE_LIMITED,
+          message: getApiErrorMessage(ApiErrorCode.RATE_LIMITED, locale),
+        },
+      });
     },
-  },
-});
+  });
+}
 
-export const generalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      code: ApiErrorCode.RATE_LIMITED,
-      message: 'Rate limit exceeded, please slow down',
-    },
-  },
-});
-
-export const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      code: ApiErrorCode.RATE_LIMITED,
-      message: 'Too many upload requests',
-    },
-  },
-});
+export const authLimiter = buildLimiter(15 * 60 * 1000, 20);
+export const generalLimiter = buildLimiter(60 * 1000, 200);
+export const uploadLimiter = buildLimiter(60 * 1000, 30);

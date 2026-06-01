@@ -4,12 +4,12 @@ import { asyncHandler } from '../../middleware/asyncHandler';
 import { buildMeta, sendPaginated, sendSuccess } from '../../utils/apiResponse';
 import {
   completeStop,
+  generateExecutionsForDate,
   getExecution,
   getExecutionAlerts,
   getExecutionGpsTrack,
   getTodayExecutions,
   listExecutions,
-  savePodToStop,
   setStopArrived,
   setStopInProgress,
   skipStop,
@@ -71,7 +71,8 @@ export const postStopArrived = asyncHandler(async (req: Request, res: Response) 
   const execution = await setStopArrived(
     req.user!.companyId,
     req.params.id,
-    req.params.stopId
+    req.params.stopId,
+    req.user
   );
   return sendSuccess(res, execution);
 });
@@ -80,7 +81,8 @@ export const postStopInProgress = asyncHandler(async (req: Request, res: Respons
   const execution = await setStopInProgress(
     req.user!.companyId,
     req.params.id,
-    req.params.stopId
+    req.params.stopId,
+    req.user
   );
   return sendSuccess(res, execution);
 });
@@ -90,7 +92,8 @@ export const postStopComplete = asyncHandler(async (req: Request, res: Response)
     req.user!.companyId,
     req.params.id,
     req.params.stopId,
-    req.body
+    req.body,
+    req.user
   );
   return sendSuccess(res, execution);
 });
@@ -101,9 +104,15 @@ export const postStopSkip = asyncHandler(async (req: Request, res: Response) => 
     req.user!.companyId,
     req.params.id,
     req.params.stopId,
-    reason
+    reason,
+    req.user
   );
   return sendSuccess(res, execution);
+});
+
+export const postGenerateExecutions = asyncHandler(async (req: Request, res: Response) => {
+  const result = await generateExecutionsForDate(req.user!.companyId, req.body);
+  return sendSuccess(res, result);
 });
 
 export const getGpsTrack = asyncHandler(async (req: Request, res: Response) => {
@@ -113,7 +122,7 @@ export const getGpsTrack = asyncHandler(async (req: Request, res: Response) => {
 
 export const getExecutionAlertsController = asyncHandler(
   async (req: Request, res: Response) => {
-    const alerts = await getExecutionAlerts(req.user!.companyId, req.params.id);
+    const alerts = await getExecutionAlerts(req.user!.companyId, req.params.id, req.locale);
     return sendSuccess(res, alerts);
   }
 );

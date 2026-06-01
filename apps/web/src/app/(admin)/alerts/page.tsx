@@ -2,8 +2,9 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
+import type { SupportedLocale } from '@logx/i18n';
 import { apiClient } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 import { formatDateTime } from '@/lib/utils';
@@ -27,6 +28,7 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 
 export default function AlertsPage() {
   const t = useTranslations('alerts');
+  const locale = useLocale() as SupportedLocale;
   const { data, isLoading } = useQuery({
     queryKey: ['alerts'],
     queryFn: async () => {
@@ -58,7 +60,7 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {unread > 0 ? `${unread} unread alert${unread > 1 ? 's' : ''}` : 'All caught up'}
+            {unread > 0 ? `${unread} ${t('title').toLowerCase()}` : t('subtitle')}
           </p>
         </div>
         {unread > 0 && (
@@ -68,7 +70,7 @@ export default function AlertsPage() {
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
           >
             <CheckCheck className="w-4 h-4" />
-            Mark all read
+            {t('acknowledge')}
           </button>
         )}
       </div>
@@ -82,7 +84,7 @@ export default function AlertsPage() {
         {!isLoading && data?.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <Bell className="w-10 h-10 mb-3 opacity-30" />
-            <p>No alerts yet</p>
+            <p>{t('noAlerts')}</p>
           </div>
         )}
         {data?.map((alert) => (
@@ -106,14 +108,14 @@ export default function AlertsPage() {
                 </span>
               </div>
               <p className="text-sm text-gray-900">{alert.message}</p>
-              <p className="text-xs text-gray-400 mt-1">{formatDateTime(alert.createdAt)}</p>
+              <p className="text-xs text-gray-400 mt-1">{formatDateTime(alert.createdAt, locale)}</p>
             </div>
             {!alert.isRead && (
               <button
                 onClick={() => markRead.mutate(alert._id)}
                 className="text-xs text-blue-600 hover:underline shrink-0"
               >
-                Mark read
+                {t('acknowledge')}
               </button>
             )}
           </div>

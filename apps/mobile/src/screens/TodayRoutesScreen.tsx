@@ -11,7 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { getExecutionStatusLabel } from '@logx/i18n';
+import { formatDateByLocale, getExecutionStatusLabel } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
@@ -103,7 +103,11 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
       <View style={styles.header}>
         <Text style={styles.title}>{t('mobile.todayRoutes')}</Text>
         <Text style={styles.subtitle}>
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+          {formatDateByLocale(new Date(), locale, {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+          })}
         </Text>
       </View>
 

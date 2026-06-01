@@ -7,6 +7,8 @@ export interface IExecutionStop {
   order: number;
   address: string;
   location: { lat: number; lng: number };
+  plannedTime: string;
+  expectedDurationMinutes: number;
   type: string;
   status: string;
   arrivedAt?: Date;
@@ -18,11 +20,13 @@ export interface IExecutionStop {
   receiverName?: string;
   deliveryNotes?: string;
   deliveryLocation?: { lat: number; lng: number };
+  instructions?: string;
 }
 
 export interface IRouteExecution extends Document {
   companyId: Types.ObjectId;
   routeId: Types.ObjectId;
+  contractId?: Types.ObjectId;
   scheduledDate: Date;
   scheduledTime: string;
   driverId: Types.ObjectId;
@@ -48,6 +52,12 @@ const executionStopSchema = new Schema<IExecutionStop>(
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
     },
+    plannedTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
+    expectedDurationMinutes: { type: Number, default: 15 },
     type: { type: String, enum: ['PICKUP', 'DELIVERY', 'BOTH'], required: true },
     status: {
       type: String,
@@ -62,6 +72,7 @@ const executionStopSchema = new Schema<IExecutionStop>(
     podSignature: { type: String },
     receiverName: { type: String },
     deliveryNotes: { type: String },
+    instructions: { type: String },
     deliveryLocation: {
       lat: { type: Number },
       lng: { type: Number },
@@ -74,6 +85,7 @@ const routeExecutionSchema = new Schema<IRouteExecution>(
   {
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
     routeId: { type: Schema.Types.ObjectId, ref: 'Route', required: true },
+    contractId: { type: Schema.Types.ObjectId, ref: 'Contract' },
     scheduledDate: { type: Date, required: true },
     scheduledTime: { type: String, required: true },
     driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },

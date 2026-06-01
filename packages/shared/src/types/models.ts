@@ -77,17 +77,24 @@ export interface RouteStopDto {
   order: number;
   address: string;
   location: { lat: number; lng: number };
+  plannedTime: string;
   expectedDurationMinutes: number;
   type: RouteStopType;
+  instructions?: string;
 }
 
 export interface RouteDto extends BaseModel {
   companyId: string;
+  clientId?: ClientDto | string;
   contractId?: ContractDto | string;
   name: string;
   description?: string;
   recurrenceType: RecurrenceType;
   daysOfWeek: number[];
+  dayOfMonth?: number;
+  monthOfYear?: number;
+  recurrenceStartDate?: string;
+  recurrenceEndDate?: string;
   scheduledTime: string;
   isActive: boolean;
   isTemplate: boolean;
@@ -102,6 +109,8 @@ export interface ExecutionStopDto {
   order: number;
   address: string;
   location: { lat: number; lng: number };
+  plannedTime: string;
+  expectedDurationMinutes: number;
   type: RouteStopType;
   status: StopStatus;
   arrivedAt?: string;
@@ -113,11 +122,13 @@ export interface ExecutionStopDto {
   receiverName?: string;
   deliveryNotes?: string;
   deliveryLocation?: { lat: number; lng: number };
+  instructions?: string;
 }
 
 export interface RouteExecutionDto extends BaseModel {
   companyId: string;
   routeId: RouteDto | string;
+  contractId?: ContractDto | string;
   scheduledDate: string;
   scheduledTime: string;
   driverId: DriverDto | string;

@@ -32,5 +32,5 @@ export const patchVehicle = asyncHandler(async (req: Request, res: Response) => 
 
 export const deleteVehicle = asyncHandler(async (req: Request, res: Response) => {
   await deactivateVehicle(req.user!.companyId, req.params.id);
-  return sendSuccess(res, { message: 'Vehicle deactivated' });
+  return sendSuccess(res, { success: true });
 });

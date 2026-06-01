@@ -31,5 +31,5 @@ export const patchBranch = asyncHandler(async (req: Request, res: Response) => {
 export const deleteBranchController = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.user!.companyId;
   await deleteBranch(companyId, req.params.id);
-  return sendSuccess(res, { message: 'Branch deactivated' });
+  return sendSuccess(res, { success: true });
 });

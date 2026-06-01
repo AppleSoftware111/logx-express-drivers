@@ -176,3 +176,25 @@ export function translateValidationKey(locale: SupportedLocale, key: string): st
   const direct = (loadMessages(locale).validation as Record<string, string>)[bare];
   return direct ?? key;
 }
+
+export function formatMessage(
+  locale: SupportedLocale,
+  namespace: keyof MessageNamespaces,
+  key: string,
+  params?: Record<string, string | number>,
+  fallback?: string
+): string {
+  let template =
+    getNestedMessage(locale, namespace, key) ??
+    getNestedMessage('pt', namespace, key) ??
+    fallback ??
+    key;
+
+  if (!params) return template;
+
+  for (const [paramKey, value] of Object.entries(params)) {
+    template = template.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(value));
+  }
+
+  return template;
+}

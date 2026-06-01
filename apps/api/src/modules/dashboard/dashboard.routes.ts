@@ -8,6 +8,8 @@ import { cacheKey, withCache } from '../../utils/cache';
 import { Alert } from '../../models/Alert.model';
 import { Driver } from '../../models/Driver.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
+import { localizeAlertDocument } from '../alerts/alert.service';
+import { getCurrentBusinessDate, toDateString } from '../../utils/timeCalc';
 
 const router = Router();
 
@@ -17,10 +19,9 @@ router.get(
   '/summary',
   asyncHandler(async (req: Request, res: Response) => {
     const companyId = req.user!.companyId;
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const today = getCurrentBusinessDate();
 
-    const key = cacheKey('dashboard:summary', companyId, today.toISOString().slice(0, 10));
+    const key = cacheKey('dashboard:summary', companyId, toDateString(today), req.locale);
 
     const summary = await withCache(key, 30, async () => {
       const [
@@ -76,7 +77,7 @@ router.get(
           completedToday,
           unreadAlerts,
         },
-        recentAlerts,
+        recentAlerts: recentAlerts.map((alert) => localizeAlertDocument(alert, req.locale)),
         activeExecutions,
       };
     });

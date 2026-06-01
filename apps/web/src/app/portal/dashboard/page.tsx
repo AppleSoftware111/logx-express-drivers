@@ -1,9 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import { CheckCircle, Clock, Package, Truck } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { CheckCircle, Clock, Truck } from 'lucide-react';
 import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+
+import { formatDateByLocale, getExecutionStatusLabel, type SupportedLocale } from '@logx/i18n';
 
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
 import { apiClient } from '@/lib/api';
@@ -12,6 +14,8 @@ import { getStatusColor } from '@/lib/utils';
 
 export default function PortalDashboardPage() {
   const t = useTranslations('portal');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as SupportedLocale;
   const today = new Date().toISOString().slice(0, 10);
   const hasToken = useHasAccessToken();
 
@@ -39,7 +43,12 @@ export default function PortalDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{t('todayDeliveries')}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          {formatDateByLocale(new Date(), locale, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
         </p>
       </div>
 
@@ -50,7 +59,7 @@ export default function PortalDashboardPage() {
           </div>
           <div>
             <p className="text-xl font-bold text-gray-900">{pending}</p>
-            <p className="text-sm text-gray-500">Pending</p>
+            <p className="text-sm text-gray-500">{tCommon('pending')}</p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
@@ -59,7 +68,7 @@ export default function PortalDashboardPage() {
           </div>
           <div>
             <p className="text-xl font-bold text-gray-900">{inProgress}</p>
-            <p className="text-sm text-gray-500">In Progress</p>
+            <p className="text-sm text-gray-500">{tCommon('inProgress')}</p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
@@ -68,7 +77,7 @@ export default function PortalDashboardPage() {
           </div>
           <div>
             <p className="text-xl font-bold text-gray-900">{completed}</p>
-            <p className="text-sm text-gray-500">Completed</p>
+            <p className="text-sm text-gray-500">{tCommon('completed')}</p>
           </div>
         </div>
       </div>
@@ -76,7 +85,7 @@ export default function PortalDashboardPage() {
       {liveDriver && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-900">Driver Live Location</h2>
+            <h2 className="font-semibold text-gray-900">{t('driverLiveLocation')}</h2>
           </div>
           <div className="h-64">
             <GoogleMapsProvider className="h-full w-full">
@@ -105,7 +114,7 @@ export default function PortalDashboardPage() {
       {/* Today's routes list */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Route Status</h2>
+          <h2 className="font-semibold text-gray-900">{t('routeStatus')}</h2>
         </div>
         <div className="divide-y divide-gray-100">
           {executions?.map((exec: {
@@ -120,22 +129,25 @@ export default function PortalDashboardPage() {
               <div>
                 <p className="font-medium text-sm text-gray-900">{exec.routeId?.name}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Driver: {exec.driverId?.name} · {exec.scheduledTime}
+                  {t('driverLabel')}: {exec.driverId?.name} · {exec.scheduledTime}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400">
-                  {exec.stops?.filter((s: { status: string }) => s.status === 'COMPLETED').length}/{exec.stops?.length} stops
+                  {t('stopsCompleted', {
+                    completed: exec.stops?.filter((s: { status: string }) => s.status === 'COMPLETED').length,
+                    total: exec.stops?.length,
+                  })}
                 </span>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(exec.status)}`}>
-                  {exec.status}
+                  {getExecutionStatusLabel(exec.status, locale)}
                 </span>
               </div>
             </div>
           ))}
           {!executions?.length && (
             <div className="px-5 py-8 text-center text-gray-400 text-sm">
-              No deliveries scheduled for today
+              {t('noDeliveries')}
             </div>
           )}
         </div>

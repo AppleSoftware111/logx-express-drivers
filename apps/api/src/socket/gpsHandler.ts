@@ -1,15 +1,17 @@
 import type { Server, Socket } from 'socket.io';
 
-import { DEFAULT_LOCALE, getNestedMessage } from '@logx/i18n';
+import { DEFAULT_LOCALE, formatMessage } from '@logx/i18n';
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { Driver } from '../models/Driver.model';
+import { User } from '../models/User.model';
 import { checkGeofenceArrivals, bufferGpsPoint, updateDriverLocation } from '../modules/tracking/tracking.service';
 
 export function registerGpsHandlers(io: Server, socket: Socket): void {
-  const { driverId, companyId } = socket.data as {
+  const { driverId, companyId, userId } = socket.data as {
     driverId?: string;
     companyId: string;
+    userId?: string;
     role: string;
   };
 
@@ -63,14 +65,20 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
         );
 
         if (arrival) {
+          const user = userId
+            ? await User.findById(userId).select('locale').lean()
+            : null;
           // Notify the driver they arrived
           socket.emit(SOCKET_EVENTS.DRIVER_ARRIVED_CONFIRMED, {
             stopId: arrival.stopId,
             clientName: arrival.clientName,
-            message: (
-              getNestedMessage(DEFAULT_LOCALE, 'notifications', 'geofenceDriverArrival') ??
-              'Você chegou em {stopName}'
-            ).replace('{stopName}', arrival.clientName),
+            message: formatMessage(
+              user?.locale ?? DEFAULT_LOCALE,
+              'notifications',
+              'geofenceDriverArrival',
+              { stopName: arrival.clientName },
+              'You arrived at {stopName}'
+            ),
           });
 
           // Notify admin

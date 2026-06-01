@@ -1,4 +1,9 @@
-import { getDelayLabel as getDelayLabelI18n, type SupportedLocale } from '@logx/i18n';
+import {
+  formatDateByLocale,
+  formatDateTimeByLocale,
+  getDelayLabel as getDelayLabelI18n,
+  type SupportedLocale,
+} from '@logx/i18n';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -6,24 +11,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date | string, format = 'dd/MM/yyyy'): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
+export function formatDate(
+  date: Date | string,
+  format = 'dd/MM/yyyy',
+  locale: SupportedLocale = 'pt'
+): string {
+  if (format === 'dd/MM/yyyy') {
+    return formatDateByLocale(date, locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  }
 
-  return format
-    .replace('dd', day)
-    .replace('MM', month)
-    .replace('yyyy', String(year))
-    .replace('HH', hours)
-    .replace('mm', minutes);
+  if (format === 'dd/MM/yyyy HH:mm') {
+    return formatDateTimeByLocale(date, locale);
+  }
+
+  return formatDateByLocale(date, locale);
 }
 
-export function formatDateTime(date: Date | string): string {
-  return formatDate(date, 'dd/MM/yyyy HH:mm');
+export function formatDateTime(date: Date | string, locale: SupportedLocale = 'pt'): string {
+  return formatDate(date, 'dd/MM/yyyy HH:mm', locale);
 }
 
 export function getDelayColor(delayMinutes: number): string {

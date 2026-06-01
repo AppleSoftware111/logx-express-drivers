@@ -7,6 +7,8 @@ const {
   resolveLocale,
   getApiErrorMessage,
   ApiErrorCode,
+  formatMessage,
+  formatDateTimeByLocale,
 } = require('../dist/index.js');
 
 assert.equal(resolveLocaleFromAcceptLanguage('pt-BR,en;q=0.9'), 'pt');
@@ -22,5 +24,11 @@ const enMsg = getApiErrorMessage(ApiErrorCode.DRIVER_NOT_FOUND, 'en');
 const esMsg = getApiErrorMessage(ApiErrorCode.DRIVER_NOT_FOUND, 'es');
 assert.notEqual(ptMsg, enMsg);
 assert.notEqual(ptMsg, esMsg);
+
+assert.equal(
+  formatMessage('en', 'notifications', 'geofenceDriverArrival', { stopName: 'Lab 1' }),
+  'You arrived at Lab 1'
+);
+assert.notEqual(formatDateTimeByLocale('2026-06-01T10:30:00Z', 'pt'), formatDateTimeByLocale('2026-06-01T10:30:00Z', 'en'));
 
 console.log('i18n unit checks passed');

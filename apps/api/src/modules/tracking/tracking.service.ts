@@ -5,6 +5,7 @@ import { Client } from '../../models/Client.model';
 import { Driver } from '../../models/Driver.model';
 import { GpsPoint } from '../../models/GpsPoint.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
+import { syncExecutionLifecycle, touchDashboard } from '../executions/execution.service';
 import { isWithinRadius } from '../../utils/haversine';
 
 interface BufferedGpsPoint extends GpsPointInput {
@@ -99,7 +100,9 @@ export async function checkGeofenceArrivals(
         }
       }
 
+      syncExecutionLifecycle(execution);
       await execution.save();
+      touchDashboard(companyId);
 
       // Get the client name from populated data
       const client = await Client.findById(stop.clientId).select('name').lean();

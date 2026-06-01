@@ -35,5 +35,5 @@ export const patchCompany = asyncHandler(async (req: Request, res: Response) => 
 
 export const deleteCompany = asyncHandler(async (req: Request, res: Response) => {
   await deactivateCompany(req.params.id);
-  return sendSuccess(res, { message: 'Company deactivated' });
+  return sendSuccess(res, { success: true });
 });

@@ -1,6 +1,9 @@
 import type { Request, Response } from 'express';
 
+import { ApiErrorCode } from '@logx/i18n';
+
 import { asyncHandler } from '../../middleware/asyncHandler';
+import { AppError } from '../../middleware/errorHandler';
 import { sendSuccess } from '../../utils/apiResponse';
 import {
   getMeService,
@@ -24,7 +27,7 @@ const cookieOptions = {
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body as { email: string; password: string };
 
-  const result = await loginService(email, password);
+  const result = await loginService(email, password, req.locale);
 
   res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, cookieOptions);
 
@@ -39,10 +42,10 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
     req.cookies?.[REFRESH_COOKIE_NAME] ?? req.body?.refreshToken;
 
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Refresh token not provided' });
+    throw new AppError(ApiErrorCode.AUTH_TOKEN_MISSING, 401);
   }
 
-  const tokens = await refreshTokenService(token);
+  const tokens = await refreshTokenService(token, req.locale);
 
   res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, cookieOptions);
 
@@ -57,7 +60,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 
   res.clearCookie(REFRESH_COOKIE_NAME, { path: '/' });
 
-  return sendSuccess(res, { message: 'Logged out successfully' });
+  return sendSuccess(res, { success: true });
 });
 
 export const me = asyncHandler(async (req: Request, res: Response) => {

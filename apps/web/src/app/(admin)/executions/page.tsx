@@ -5,12 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 
+import { getExecutionStatusLabel, type SupportedLocale } from '@logx/i18n';
 import { apiClient } from '@/lib/api';
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
 export default function ExecutionsPage() {
   const t = useTranslations('executions');
-  const locale = useLocale();
+  const locale = useLocale() as SupportedLocale;
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('');
 
@@ -31,7 +32,7 @@ export default function ExecutionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Route execution history and live status</p>
+          <p className="text-sm text-gray-500 mt-1">{t('routeExecutionHistory')}</p>
         </div>
       </div>
 
@@ -48,11 +49,11 @@ export default function ExecutionsPage() {
           onChange={(e) => setStatus(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">All statuses</option>
+          <option value="">{t('allStatuses')}</option>
           {['PENDING', 'ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(
             (s) => (
               <option key={s} value={s}>
-                {s}
+                {getExecutionStatusLabel(s, locale)}
               </option>
             )
           )}
@@ -65,27 +66,27 @@ export default function ExecutionsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 text-left">Route</th>
-                <th className="px-5 py-3 text-left">Driver</th>
-                <th className="px-5 py-3 text-left">Date</th>
-                <th className="px-5 py-3 text-left">Scheduled</th>
-                <th className="px-5 py-3 text-left">Status</th>
-                <th className="px-5 py-3 text-left">Delay</th>
-                <th className="px-5 py-3 text-left">Actions</th>
+                <th className="px-5 py-3 text-left">{t('routeColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('driverColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('dateColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('scheduledColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('statusColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('delayColumn')}</th>
+                <th className="px-5 py-3 text-left">{t('actionsColumn')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading && (
                 <tr>
                   <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                    Loading…
+                    {t('loading')}
                   </td>
                 </tr>
               )}
               {!isLoading && executions.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                    No executions found
+                    {t('noExecutions')}
                   </td>
                 </tr>
               )}
@@ -95,28 +96,51 @@ export default function ExecutionsPage() {
                 scheduledTime: string;
                 status: string;
                 delayMinutes: number;
+                actualStartTime?: string;
+                actualEndTime?: string;
+                totalDurationMinutes?: number;
                 routeId: { name: string };
                 driverId: { name: string };
+                stops?: Array<{ status: string }>;
               }) => (
                 <tr key={exec._id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-gray-900">{exec.routeId?.name}</td>
+                  <td className="px-5 py-3 font-medium text-gray-900">
+                    <div>
+                      <p>{exec.routeId?.name}</p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {t('stopsCount', { count: exec.stops?.length ?? 0 })}
+                      </p>
+                    </div>
+                  </td>
                   <td className="px-5 py-3 text-gray-600">{exec.driverId?.name}</td>
                   <td className="px-5 py-3 text-gray-600">
-                    {new Date(exec.scheduledDate).toLocaleDateString('pt-BR')}
+                    {formatDateTime(`${exec.scheduledDate}T00:00:00`, locale)}
                   </td>
-                  <td className="px-5 py-3 text-gray-600">{exec.scheduledTime}</td>
+                  <td className="px-5 py-3 text-gray-600">
+                    <div>
+                      <p>{exec.scheduledTime}</p>
+                      {exec.actualStartTime && (
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {t('started')} {formatDateTime(exec.actualStartTime, locale)}
+                        </p>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(exec.status)}`}>
-                      {exec.status}
+                      {getExecutionStatusLabel(exec.status, locale)}
                     </span>
                   </td>
                   <td className="px-5 py-3">
                     {exec.delayMinutes > 0 ? (
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getDelayColor(exec.delayMinutes)}`}>
-                        {getDelayLabel(exec.delayMinutes)}
+                        {getDelayLabel(exec.delayMinutes, locale)}
                       </span>
                     ) : (
-                      <span className="text-green-600 text-xs">On time</span>
+                      <span className="text-green-600 text-xs">{t('onTime')}</span>
+                    )}
+                    {exec.totalDurationMinutes !== undefined && (
+                      <p className="mt-1 text-xs text-gray-400">{t('totalDuration', { minutes: exec.totalDurationMinutes })}</p>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -124,7 +148,7 @@ export default function ExecutionsPage() {
                       href={`/executions/${exec._id}`}
                       className="text-blue-600 hover:underline text-xs"
                     >
-                      View details →
+                      {t('viewDetails')} →
                     </Link>
                   </td>
                 </tr>
