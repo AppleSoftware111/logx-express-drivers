@@ -1,8 +1,16 @@
 /** @type {import('expo/config').ExpoConfig} */
 const appJson = require('./app.json');
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:4000';
+const buildProfile = process.env.EAS_BUILD_PROFILE ?? process.env.APP_VARIANT ?? 'development';
+const isProductionProfile = buildProfile === 'production';
+const fallbackApiUrl = isProductionProfile ? undefined : 'http://10.0.2.2:4000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? appJson.expo.extra?.apiUrl ?? fallbackApiUrl;
+
+if (!API_URL) {
+  throw new Error(
+    'Missing EXPO_PUBLIC_API_URL for mobile build. Set it explicitly for production builds.'
+  );
+}
 
 module.exports = {
   expo: {
@@ -17,8 +25,7 @@ module.exports = {
     android: {
       ...appJson.expo.android,
       versionCode: 1,
-      // Allow HTTP to local/dev API (LAN or emulator). Remove for production HTTPS-only.
-      usesCleartextTraffic: true,
+      usesCleartextTraffic: !isProductionProfile && API_URL.startsWith('http://'),
     },
   },
 };

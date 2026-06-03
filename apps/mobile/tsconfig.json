@@ -15,5 +15,5 @@
       "@logx/shared": ["../../packages/shared/src/index.ts"]
     }
   },
-  "include": ["App.tsx", "src/**/*.ts", "src/**/*.tsx"]
+  "include": ["App.tsx", "src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"]
 }

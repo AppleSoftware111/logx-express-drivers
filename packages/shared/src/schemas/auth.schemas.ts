@@ -9,6 +9,15 @@ export const refreshTokenSchema = z.object({
   refreshToken: z.string().optional(),
 });
 
+export const updateUserPreferencesSchema = z
+  .object({
+    locale: z.enum(['pt', 'es', 'en']).optional(),
+  })
+  .refine((data) => data.locale !== undefined, {
+    message: 'validation.required',
+    path: ['locale'],
+  });
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, 'validation.currentPasswordRequired'),
@@ -26,3 +35,4 @@ export const changePasswordSchema = z
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type UpdateUserPreferencesInput = z.infer<typeof updateUserPreferencesSchema>;

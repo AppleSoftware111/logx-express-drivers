@@ -1,12 +1,23 @@
 {
   "title": "Relatórios",
   "subtitle": "Métricas e exportação",
+  "performanceExport": "Métricas de desempenho e exportação",
   "startDate": "Data inicial",
   "endDate": "Data final",
+  "apply": "Aplicar",
   "generate": "Gerar",
   "exportCsv": "Exportar CSV",
   "exportPdf": "Exportar PDF",
   "totalDeliveries": "Total de entregas",
   "avgWaitTime": "Tempo médio de espera",
-  "onTimeRate": "Taxa no horário"
+  "onTimeRate": "Taxa no horário",
+  "completionRateByDriver": "Taxa de conclusão por motorista",
+  "completionRate": "Taxa de conclusão",
+  "driverPerformance": "Desempenho dos motoristas",
+  "driver": "Motorista",
+  "executions": "Execuções",
+  "totalStops": "Total de paradas",
+  "completionPercent": "Conclusão %",
+  "avgWaitMinutes": "Espera média (min)",
+  "totalDelayMinutes": "Atraso total (min)"
 }

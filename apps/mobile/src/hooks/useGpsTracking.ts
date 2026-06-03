@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
+import { API_URL } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import {
   startBackgroundGps,
@@ -10,8 +11,6 @@ import {
   setGpsCallback,
   type GpsPayload,
 } from '../services/gpsService';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export function useGpsTracking(executionId: string | null, isActive: boolean) {
   const { accessToken } = useAuthStore();

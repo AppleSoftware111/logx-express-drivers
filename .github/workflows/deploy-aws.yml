@@ -33,6 +33,9 @@ env:
   ECR_REPOSITORY_WEB: ${{ vars.ECR_REPOSITORY_WEB || 'logx-web' }}
   NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
   NEXT_PUBLIC_GOOGLE_MAPS_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_KEY }}
+  FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+  CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+  APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'America/Sao_Paulo' }}
   S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME || 'my-website-bucket' }}
   CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID || 'ECN1RSCDU3H3U' }}
 
@@ -101,8 +104,6 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
-          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
         run: |
           set -euo pipefail
           SERVICE_TASK_DEF_ARN="$(aws ecs describe-services \
@@ -123,19 +124,25 @@ jobs:
             --arg JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET" \
             --arg FRONTEND_URL "$FRONTEND_URL" \
             --arg CORS_ORIGINS "$CORS_ORIGINS" \
+            --arg APP_TIMEZONE "$APP_TIMEZONE" \
             '
+            def merge_env($patch):
+              (((.environment // []) | map({key: .name, value: .value}) | from_entries) + $patch)
+              | to_entries
+              | map({name: .key, value: (.value | tostring)});
             .containerDefinitions = (.containerDefinitions | map(
               if .name == $NAME then
                 .image = $IMAGE |
-                .environment = [
-                  {"name": "NODE_ENV", "value": "production"},
-                  {"name": "MONGODB_URI", "value": $MONGODB_URI},
-                  {"name": "REDIS_URL", "value": $REDIS_URL},
-                  {"name": "JWT_SECRET", "value": $JWT_SECRET},
-                  {"name": "JWT_REFRESH_SECRET", "value": $JWT_REFRESH_SECRET},
-                  {"name": "FRONTEND_URL", "value": $FRONTEND_URL},
-                  {"name": "CORS_ORIGINS", "value": $CORS_ORIGINS}
-                ]
+                .environment = merge_env({
+                  "NODE_ENV": "production",
+                  "MONGODB_URI": $MONGODB_URI,
+                  "REDIS_URL": $REDIS_URL,
+                  "JWT_SECRET": $JWT_SECRET,
+                  "JWT_REFRESH_SECRET": $JWT_REFRESH_SECRET,
+                  "FRONTEND_URL": $FRONTEND_URL,
+                  "CORS_ORIGINS": $CORS_ORIGINS,
+                  "APP_TIMEZONE": $APP_TIMEZONE
+                })
               else . end
             )) |
             del(
@@ -159,6 +166,10 @@ jobs:
             --service "$ECS_SERVICE_API" \
             --task-definition "$NEW_TASK_DEF_ARN"
 
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE_API"
+
       - name: Deploy Web service
         env:
           NEW_IMAGE: ${{ steps.build-web.outputs.image }}
@@ -177,12 +188,16 @@ jobs:
             --arg IMAGE "$NEW_IMAGE" \
             --arg NAME "$ECS_CONTAINER_WEB" \
             '
+            def merge_env($patch):
+              (((.environment // []) | map({key: .name, value: .value}) | from_entries) + $patch)
+              | to_entries
+              | map({name: .key, value: (.value | tostring)});
             .containerDefinitions = (.containerDefinitions | map(
               if .name == $NAME then
                 .image = $IMAGE |
-                .environment = [
-                  {"name": "NODE_ENV", "value": "production"}
-                ]
+                .environment = merge_env({
+                  "NODE_ENV": "production"
+                })
               else . end
             )) |
             del(
@@ -205,6 +220,20 @@ jobs:
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE_WEB" \
             --task-definition "$NEW_TASK_DEF_ARN"
+
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE_WEB"
+
+      - name: Smoke test deployed services
+        run: |
+          set -euo pipefail
+
+          curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+            "${NEXT_PUBLIC_API_URL%/}/health"
+
+          curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+            "${FRONTEND_URL%/}/login"
 
       - name: Invalidate CloudFront cache
         if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}

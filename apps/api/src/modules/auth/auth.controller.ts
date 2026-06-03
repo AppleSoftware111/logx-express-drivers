@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { ApiErrorCode } from '@logx/i18n';
+import type { UpdateUserPreferencesInput } from '@logx/shared';
 
 import { asyncHandler } from '../../middleware/asyncHandler';
 import { AppError } from '../../middleware/errorHandler';
@@ -10,6 +11,7 @@ import {
   loginService,
   logoutService,
   refreshTokenService,
+  updateUserPreferencesService,
 } from './auth.service';
 
 const REFRESH_COOKIE_NAME = 'refreshToken';
@@ -65,5 +67,13 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 
 export const me = asyncHandler(async (req: Request, res: Response) => {
   const user = await getMeService(req.user!.userId);
+  return sendSuccess(res, user);
+});
+
+export const updatePreferences = asyncHandler(async (req: Request, res: Response) => {
+  const user = await updateUserPreferencesService(
+    req.user!.userId,
+    req.body as UpdateUserPreferencesInput
+  );
   return sendSuccess(res, user);
 });

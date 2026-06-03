@@ -15,21 +15,24 @@ import {
   routeRunsOnDate,
   toDateString,
 } from '../utils/timeCalc';
+import { runWithJobLock } from './jobLock';
 
 export function startDailyRouteGeneratorJob(): void {
   cron.schedule(
     '1 0 * * *',
     async () => {
-      console.info('[job:dailyRouteGenerator] Starting daily route generation');
+      await runWithJobLock('daily-route-generator', 10 * 60 * 1000, async () => {
+        console.info('[job:dailyRouteGenerator] Starting daily route generation');
 
-      const today = businessDateStringToUtcDate(getCurrentBusinessDateString());
+        const today = businessDateStringToUtcDate(getCurrentBusinessDateString());
 
-      try {
-        await generateRoutesForDate(today);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('[job:dailyRouteGenerator] Fatal error:', msg);
-      }
+        try {
+          await generateRoutesForDate(today);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[job:dailyRouteGenerator] Fatal error:', msg);
+        }
+      });
     },
     { timezone: env.APP_TIMEZONE }
   );

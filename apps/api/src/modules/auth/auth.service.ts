@@ -29,6 +29,10 @@ export interface LoginResult extends AuthTokens {
   };
 }
 
+export interface UpdateUserPreferencesInput {
+  locale?: SupportedLocale;
+}
+
 export async function loginService(
   email: string,
   password: string,
@@ -66,7 +70,7 @@ export async function loginService(
   await User.findByIdAndUpdate(user._id, {
     $set: {
       refreshTokens: validTokens,
-      ...(locale ? { locale } : {}),
+      ...(locale ? { locale, localeUpdatedAt: new Date() } : {}),
     },
   });
 
@@ -129,7 +133,7 @@ export async function refreshTokenService(
   await User.findByIdAndUpdate(user._id, {
     $set: {
       refreshTokens: updatedTokens,
-      ...(locale ? { locale } : {}),
+      ...(locale ? { locale, localeUpdatedAt: new Date() } : {}),
     },
   });
 
@@ -149,6 +153,33 @@ export async function logoutService(
 
 export async function getMeService(userId: string) {
   const user = await User.findById(userId)
+    .select('-passwordHash -refreshTokens')
+    .populate('companyId', 'name logo')
+    .lean();
+
+  if (!user) {
+    throw new AppError(ApiErrorCode.USER_NOT_FOUND, 404);
+  }
+
+  return user;
+}
+
+export async function updateUserPreferencesService(
+  userId: string,
+  input: UpdateUserPreferencesInput
+) {
+  const updates: Record<string, unknown> = {};
+
+  if (input.locale) {
+    updates.locale = input.locale;
+    updates.localeUpdatedAt = new Date();
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { $set: updates },
+    { new: true }
+  )
     .select('-passwordHash -refreshTokens')
     .populate('companyId', 'name logo')
     .lean();

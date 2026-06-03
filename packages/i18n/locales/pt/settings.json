@@ -1,9 +1,17 @@
 {
   "title": "Configurações",
+  "subtitle": "Configuração da empresa e do sistema",
   "company": "Empresa",
   "branches": "Filiais",
   "whatsapp": "WhatsApp",
   "saveSettings": "Salvar configurações",
   "companyName": "Nome da empresa",
-  "cnpj": "CNPJ"
+  "cnpj": "CNPJ",
+  "companyId": "ID da empresa",
+  "yourRole": "Seu perfil",
+  "profile": "Seu perfil",
+  "changePassword": "Alterar senha",
+  "languageHint": "As mudanças são salvas no navegador e também nas preferências da sua conta.",
+  "allCompanies": "Todas as empresas (SUPER_ADMIN)",
+  "noCnpj": "Sem CNPJ"
 }

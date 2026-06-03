@@ -1,4 +1,4 @@
-# LOGX Express
+# LOGX BioPoli
 
 Production-grade healthcare logistics SaaS platform for hospital and laboratory courier operations in Brazil.
 
@@ -78,9 +78,23 @@ npm install
 
 ### 2. Configure Environment
 
+Create a root `.env` file manually and populate the required backend variables from
+[`apps/api/src/config/env.ts`](apps/api/src/config/env.ts), plus the web/mobile runtime
+URLs used by your environment.
+
+Minimum local values:
+
 ```bash
-cp .env.example .env
-# Edit .env with your credentials
+NODE_ENV=development
+PORT=4000
+MONGODB_URI=<your-mongodb-uri>
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=<32+ char secret>
+JWT_REFRESH_SECRET=<32+ char secret>
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGINS=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:4000
+APP_TIMEZONE=America/Sao_Paulo
 ```
 
 ### 3. Seed Super Admin
@@ -103,7 +117,7 @@ This starts:
 
 ```bash
 cd apps/mobile
-copy .env.example .env
+set EXPO_PUBLIC_API_URL=http://10.0.2.2:4000
 npm run generate:assets
 npm start
 ```
@@ -116,6 +130,9 @@ eas login
 eas init
 npm run build:apk:cloud
 ```
+
+Production mobile builds must provide `EXPO_PUBLIC_API_URL` explicitly. The production
+Expo config now fails fast if this value is missing.
 
 ## API Endpoints
 
@@ -149,10 +166,8 @@ npm run build:apk:cloud
 ## Deployment
 
 ```bash
-# Build images and start
-docker-compose up -d
-
-# Or deploy to Railway/Render using package.json scripts
+# Build images from the monorepo root and start local containers
+docker-compose up -d --build
 ```
 
 For AWS ECS + GitHub Actions CI/CD deployment, see:

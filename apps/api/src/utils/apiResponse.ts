@@ -1,6 +1,11 @@
 import type { Response } from 'express';
 
-import type { ApiResponse, PaginationMeta } from '@logx/shared';
+import type {
+  ApiErrorPayload,
+  ApiErrorResponse,
+  ApiResponse,
+  PaginationMeta,
+} from '@logx/shared';
 
 export function sendSuccess<T>(res: Response, data: T, statusCode = 200): Response {
   const body: ApiResponse<T> = { success: true, data };
@@ -21,8 +26,20 @@ export function sendPaginated<T>(
   return res.status(statusCode).json(body);
 }
 
-export function sendError(res: Response, message: string, statusCode = 400): Response {
-  const body: ApiResponse = { success: false, error: message };
+export function sendError(
+  res: Response,
+  error: ApiErrorPayload | string,
+  statusCode = 400,
+  details?: Record<string, unknown>
+): Response {
+  const body: ApiErrorResponse = {
+    success: false,
+    error:
+      typeof error === 'string'
+        ? { code: 'BAD_REQUEST', message: error }
+        : error,
+    ...(details ? { details } : {}),
+  };
   return res.status(statusCode).json(body);
 }
 

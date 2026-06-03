@@ -1,9 +1,17 @@
 {
   "title": "Settings",
+  "subtitle": "Company and system configuration",
   "company": "Company",
   "branches": "Branches",
   "whatsapp": "WhatsApp",
   "saveSettings": "Save settings",
   "companyName": "Company name",
-  "cnpj": "CNPJ"
+  "cnpj": "CNPJ",
+  "companyId": "Company ID",
+  "yourRole": "Your role",
+  "profile": "Your profile",
+  "changePassword": "Change password",
+  "languageHint": "Changes are saved both in the browser and in your account preferences.",
+  "allCompanies": "All companies (SUPER_ADMIN)",
+  "noCnpj": "No CNPJ"
 }

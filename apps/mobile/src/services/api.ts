@@ -8,8 +8,10 @@ import { useLocaleStore } from '../stores/localeStore';
  * API base URL (no /api suffix).
  * - Emulator: 10.0.2.2 → host localhost
  * - Physical device: your PC LAN IP, e.g. http://192.168.1.100:4000
- * Set EXPO_PUBLIC_API_URL in apps/mobile/.env before building the APK.
+ * Set EXPO_PUBLIC_API_URL or expo.extra.apiUrl for all non-dev builds.
  */
+const DEV_FALLBACK_API_URL = 'http://10.0.2.2:4000';
+
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
   if (fromEnv) return fromEnv;
@@ -17,7 +19,13 @@ function resolveApiUrl(): string {
   const fromExtra = Constants.expoConfig?.extra?.apiUrl as string | undefined;
   if (fromExtra) return fromExtra.replace(/\/$/, '');
 
-  return 'http://10.0.2.2:4000';
+  if (__DEV__) {
+    return DEV_FALLBACK_API_URL;
+  }
+
+  throw new Error(
+    'Missing mobile API URL. Set EXPO_PUBLIC_API_URL or expo.extra.apiUrl before building.'
+  );
 }
 
 export const API_URL = resolveApiUrl();

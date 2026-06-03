@@ -2,6 +2,7 @@ import cron from 'node-cron';
 
 import { GpsPoint } from '../models/GpsPoint.model';
 import { RouteExecution } from '../models/RouteExecution.model';
+import { runWithJobLock } from './jobLock';
 
 /**
  * Weekly cron that hard-deletes GPS points older than 90 days (belt-and-suspenders on top of the
@@ -10,13 +11,15 @@ import { RouteExecution } from '../models/RouteExecution.model';
 export function startGpsCleanupJob(): void {
   // Every Sunday at 03:00 UTC
   cron.schedule('0 3 * * 0', async () => {
-    try {
-      await cleanOldGpsPoints();
-      await cleanOldCancelledExecutions();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[job:gpsCleanup] Error:', msg);
-    }
+    await runWithJobLock('gps-cleanup', 60 * 60 * 1000, async () => {
+      try {
+        await cleanOldGpsPoints();
+        await cleanOldCancelledExecutions();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[job:gpsCleanup] Error:', msg);
+      }
+    });
   });
 
   console.info('[job:gpsCleanup] Scheduled weekly (Sun 03:00 UTC)');

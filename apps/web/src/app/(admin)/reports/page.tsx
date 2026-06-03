@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, BarChart3 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
   BarChart,
@@ -33,6 +33,7 @@ interface DriverReport {
 
 export default function ReportsPage() {
   const t = useTranslations('reports');
+  const tCommon = useTranslations('common');
   const today = new Date();
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -63,21 +64,21 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Performance metrics and export</p>
+          <p className="text-sm text-gray-500 mt-1">{t('performanceExport')}</p>
         </div>
         <button
           onClick={handleExportCsv}
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
         >
           <Download className="w-4 h-4" />
-          Export CSV
+          {t('exportCsv')}
         </button>
       </div>
 
       {/* Date range filter */}
       <div className="flex items-end gap-3 bg-white rounded-xl border border-gray-200 p-4">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Start date</label>
+          <label className="block text-xs text-gray-500 mb-1">{t('startDate')}</label>
           <input
             type="date"
             value={startDate}
@@ -86,7 +87,7 @@ export default function ReportsPage() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">End date</label>
+          <label className="block text-xs text-gray-500 mb-1">{t('endDate')}</label>
           <input
             type="date"
             value={endDate}
@@ -99,7 +100,7 @@ export default function ReportsPage() {
             onClick={() => setAppliedRange({ startDate, endDate })}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
           >
-            Apply
+            {t('apply')}
           </button>
         </div>
       </div>
@@ -107,7 +108,7 @@ export default function ReportsPage() {
       {/* Chart */}
       {data && data.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Completion Rate by Driver</h2>
+          <h2 className="font-semibold text-gray-900 mb-4">{t('completionRateByDriver')}</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -115,7 +116,7 @@ export default function ReportsPage() {
               <YAxis unit="%" domain={[0, 100]} />
               <Tooltip formatter={(value, name) => [`${value}%`, name]} />
               <Legend />
-              <Bar dataKey="completionRate" name="Completion Rate" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="completionRate" name={t('completionRate')} fill="#2563eb" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -124,26 +125,26 @@ export default function ReportsPage() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Driver Performance</h2>
+          <h2 className="font-semibold text-gray-900">{t('driverPerformance')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 text-left">Driver</th>
-                <th className="px-5 py-3 text-right">Executions</th>
-                <th className="px-5 py-3 text-right">Total Stops</th>
-                <th className="px-5 py-3 text-right">Completed</th>
-                <th className="px-5 py-3 text-right">Completion %</th>
-                <th className="px-5 py-3 text-right">Avg Wait (min)</th>
-                <th className="px-5 py-3 text-right">Total Delay (min)</th>
+                <th className="px-5 py-3 text-left">{t('driver')}</th>
+                <th className="px-5 py-3 text-right">{t('executions')}</th>
+                <th className="px-5 py-3 text-right">{t('totalStops')}</th>
+                <th className="px-5 py-3 text-right">{tCommon('completed')}</th>
+                <th className="px-5 py-3 text-right">{t('completionPercent')}</th>
+                <th className="px-5 py-3 text-right">{t('avgWaitMinutes')}</th>
+                <th className="px-5 py-3 text-right">{t('totalDelayMinutes')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {isLoading && (
                 <tr>
                   <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                    Loading…
+                    {tCommon('loading')}
                   </td>
                 </tr>
               )}

@@ -32,6 +32,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function ClientsPage() {
   const t = useTranslations('clients');
+  const tCommon = useTranslations('common');
   const sessionReady = useHasAccessToken();
   const [type, setType] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -112,7 +113,7 @@ export default function ClientsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-sm text-gray-500 mt-1">Hospitals and laboratories</p>
+          <p className="text-sm text-gray-500 mt-1">{t('subtitle')}</p>
         </div>
         <button
           type="button"
@@ -120,7 +121,7 @@ export default function ClientsPage() {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Add Client
+          {t('addClient')}
         </button>
       </div>
 
@@ -130,13 +131,13 @@ export default function ClientsPage() {
           onChange={(e) => setType(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">All types</option>
-          <option value="HOSPITAL">Hospital</option>
-          <option value="LABORATORY">Laboratory</option>
-          <option value="OTHER">Other</option>
+          <option value="">{t('allTypes')}</option>
+          <option value="HOSPITAL">{t('typeHospital')}</option>
+          <option value="LABORATORY">{t('typeLaboratory')}</option>
+          <option value="OTHER">{t('typeOther')}</option>
         </select>
         <span className="text-sm text-gray-400">
-          {clients?.length ?? 0} client{clients?.length !== 1 ? 's' : ''}
+          {t('clientCount', { count: clients?.length ?? 0 })}
         </span>
       </div>
 
@@ -145,12 +146,12 @@ export default function ClientsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
               <tr>
-                <th className="px-5 py-3 text-left">Name</th>
-                <th className="px-5 py-3 text-left">Type</th>
-                <th className="px-5 py-3 text-left">Address</th>
+                <th className="px-5 py-3 text-left">{tCommon('name')}</th>
+                <th className="px-5 py-3 text-left">{t('form.type')}</th>
+                <th className="px-5 py-3 text-left">{tCommon('address')}</th>
                 <th className="px-5 py-3 text-left">CNPJ</th>
-                <th className="px-5 py-3 text-left">Portal User</th>
-                <th className="px-5 py-3 text-left">Status</th>
+                <th className="px-5 py-3 text-left">{t('portalUser')}</th>
+                <th className="px-5 py-3 text-left">{tCommon('status')}</th>
                 <th className="px-5 py-3 text-right w-16" />
               </tr>
             </thead>
@@ -167,8 +168,8 @@ export default function ClientsPage() {
                   <td colSpan={7} className="p-0">
                     <EmptyState
                       Icon={Building2}
-                      title="No clients yet"
-                      description="Add hospitals or laboratories to use them as route stops."
+                      title={t('noClientsYet')}
+                      description={t('noClientsDesc')}
                       action={
                         <button
                           type="button"
@@ -176,7 +177,7 @@ export default function ClientsPage() {
                           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
                         >
                           <Plus className="w-4 h-4" />
-                          Add Client
+                          {t('addClient')}
                         </button>
                       }
                     />
@@ -199,7 +200,7 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-5 py-3 text-gray-500 text-xs">
                     {client.userId?.email ?? (
-                      <span className="text-gray-300">No portal access</span>
+                      <span className="text-gray-300">{t('noPortalAccess')}</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -210,7 +211,7 @@ export default function ClientsPage() {
                           : 'bg-gray-100 text-gray-500'
                       }`}
                     >
-                      {client.isActive ? 'Active' : 'Inactive'}
+                      {client.isActive ? tCommon('active') : tCommon('inactive')}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -218,7 +219,7 @@ export default function ClientsPage() {
                       type="button"
                       onClick={() => openEdit(client)}
                       className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                      title="Edit client"
+                      title={t('editClient')}
                     >
                       <Pencil className="w-4 h-4" />
                     </button>

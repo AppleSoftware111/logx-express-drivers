@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { setLocaleAction } from '@/app/actions/locale';
+import { apiClient } from '@/lib/api';
 import type { SupportedLocale } from '@logx/i18n';
 import { SUPPORTED_LOCALES } from '@logx/i18n';
 
@@ -31,6 +32,9 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const onChange = (value: string) => {
     startTransition(async () => {
       await setLocaleAction(value);
+      if (typeof window !== 'undefined' && localStorage.getItem('accessToken')) {
+        await apiClient.patch('/auth/me/preferences', { locale: value }).catch(() => undefined);
+      }
       router.refresh();
     });
   };

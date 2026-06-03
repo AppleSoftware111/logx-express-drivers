@@ -1,9 +1,21 @@
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface ApiErrorPayload {
+  code: string;
+  message: string;
+}
+
+export interface ApiSuccessResponse<T = unknown> {
+  success: true;
+  data: T;
   meta?: PaginationMeta;
 }
+
+export interface ApiErrorResponse {
+  success: false;
+  error: ApiErrorPayload;
+  details?: Record<string, unknown>;
+}
+
+export type ApiResponse<T = unknown> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 export interface PaginationMeta {
   page: number;

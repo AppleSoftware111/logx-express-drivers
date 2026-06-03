@@ -15,6 +15,7 @@ import {
 import { getIO } from '../socket';
 import { invalidateCache } from '../utils/cache';
 import { calcDelayMinutes, getCurrentBusinessDate } from '../utils/timeCalc';
+import { runWithJobLock } from './jobLock';
 
 const DELAY_THRESHOLDS: { minutes: number; type: AlertType }[] = [
   { minutes: 15, type: AlertType.DELAY_15 },
@@ -26,12 +27,14 @@ export function startDelayCheckerJob(): void {
   cron.schedule(
     '*/5 * * * *',
     async () => {
-      try {
-        await checkDelays();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('[job:delayChecker] Error:', msg);
-      }
+      await runWithJobLock('delay-checker', 4 * 60 * 1000, async () => {
+        try {
+          await checkDelays();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[job:delayChecker] Error:', msg);
+        }
+      });
     },
     { timezone: env.APP_TIMEZONE }
   );

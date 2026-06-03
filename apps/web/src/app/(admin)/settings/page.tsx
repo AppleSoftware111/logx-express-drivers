@@ -4,11 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Building2, Users, Globe } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
+import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher';
 import { apiClient } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
@@ -25,25 +27,25 @@ export default function SettingsPage() {
     <div className="p-6 space-y-6 max-w-4xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="text-sm text-gray-500 mt-1">Company and system configuration</p>
+        <p className="text-sm text-gray-500 mt-1">{t('subtitle')}</p>
       </div>
 
       {/* Company info */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
           <Building2 className="w-4 h-4 text-gray-500" />
-          <h2 className="font-semibold text-gray-900">Company</h2>
+          <h2 className="font-semibold text-gray-900">{t('company')}</h2>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
             <div>
-              <p className="text-gray-500 mb-1">Company ID</p>
+              <p className="text-gray-500 mb-1">{t('companyId')}</p>
               <p className="font-mono text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded">
                 {user?.companyId ?? '—'}
               </p>
             </div>
             <div>
-              <p className="text-gray-500 mb-1">Your role</p>
+              <p className="text-gray-500 mb-1">{t('yourRole')}</p>
               <p className="font-medium text-gray-900">{user?.role}</p>
             </div>
           </div>
@@ -54,15 +56,22 @@ export default function SettingsPage() {
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
           <Users className="w-4 h-4 text-gray-500" />
-          <h2 className="font-semibold text-gray-900">Your Profile</h2>
+          <h2 className="font-semibold text-gray-900">{t('profile')}</h2>
         </div>
         <div className="px-5 py-4 space-y-3 text-sm">
           <div>
-            <p className="text-gray-500 mb-1">Email</p>
+            <p className="text-gray-500 mb-1">{tCommon('email')}</p>
             <p className="text-gray-900">{user?.email}</p>
           </div>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_200px]">
+            <div>
+              <p className="text-gray-500 mb-1">{tCommon('language')}</p>
+              <p className="text-xs text-gray-500">{t('languageHint')}</p>
+            </div>
+            <LanguageSwitcher className="w-full" />
+          </div>
           <button className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-            Change Password
+            {t('changePassword')}
           </button>
         </div>
       </div>
@@ -72,14 +81,14 @@ export default function SettingsPage() {
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
             <Globe className="w-4 h-4 text-gray-500" />
-            <h2 className="font-semibold text-gray-900">All Companies (SUPER_ADMIN)</h2>
+            <h2 className="font-semibold text-gray-900">{t('allCompanies')}</h2>
           </div>
           <div className="divide-y divide-gray-100">
             {companies?.map((company: { _id: string; name: string; cnpj?: string; isActive: boolean }) => (
               <div key={company._id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <div>
                   <p className="font-medium text-gray-900">{company.name}</p>
-                  <p className="text-xs text-gray-400 font-mono">{company.cnpj ?? 'No CNPJ'}</p>
+                  <p className="text-xs text-gray-400 font-mono">{company.cnpj ?? t('noCnpj')}</p>
                 </div>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full ${
@@ -88,7 +97,7 @@ export default function SettingsPage() {
                       : 'bg-gray-100 text-gray-500'
                   }`}
                 >
-                  {company.isActive ? 'Active' : 'Inactive'}
+                  {company.isActive ? tCommon('active') : tCommon('inactive')}
                 </span>
               </div>
             ))}

@@ -9,6 +9,7 @@ import {
 } from '@logx/i18n';
 
 import { env } from '../config/env';
+import { sendError } from '../utils/apiResponse';
 
 export class AppError extends Error {
   public readonly code: ApiErrorCode;
@@ -53,47 +54,53 @@ export function errorHandler(
   const locale = req.locale ?? 'pt';
 
   if (err instanceof ZodError) {
-    res.status(400).json({
-      success: false,
-      error: {
+    sendError(
+      res,
+      {
         code: ApiErrorCode.VALIDATION_ERROR,
         message: getApiErrorMessage(ApiErrorCode.VALIDATION_ERROR, locale),
       },
-      details: localizeValidationDetails(err.flatten().fieldErrors, locale),
-    });
+      400,
+      {
+        fields: localizeValidationDetails(err.flatten().fieldErrors, locale),
+      }
+    );
     return;
   }
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      success: false,
-      error: {
+    sendError(
+      res,
+      {
         code: err.code,
         message: getApiErrorMessage(err.code, locale, err.params),
       },
-    });
+      err.statusCode
+    );
     return;
   }
 
   if (err instanceof Error && err.name === 'CastError') {
-    res.status(400).json({
-      success: false,
-      error: {
+    sendError(
+      res,
+      {
         code: ApiErrorCode.INVALID_ID,
         message: getApiErrorMessage(ApiErrorCode.INVALID_ID, locale),
       },
-    });
+      400
+    );
     return;
   }
 
   if (err instanceof Error && err.name === 'ValidationError') {
-    res.status(400).json({
-      success: false,
-      error: {
+    sendError(
+      res,
+      {
         code: ApiErrorCode.VALIDATION_ERROR,
         message: err.message,
       },
-    });
+      400
+    );
     return;
   }
 
@@ -102,27 +109,29 @@ export function errorHandler(
     'code' in err &&
     (err as NodeJS.ErrnoException).code === '11000'
   ) {
-    res.status(409).json({
-      success: false,
-      error: {
+    sendError(
+      res,
+      {
         code: ApiErrorCode.DUPLICATE_KEY,
         message: getApiErrorMessage(ApiErrorCode.DUPLICATE_KEY, locale),
       },
-    });
+      409
+    );
     return;
   }
 
   const message = err instanceof Error ? err.message : 'Internal server error';
   console.error('[error]', err);
 
-  res.status(500).json({
-    success: false,
-    error: {
+  sendError(
+    res,
+    {
       code: ApiErrorCode.INTERNAL_ERROR,
       message:
         env.NODE_ENV === 'production'
           ? getApiErrorMessage(ApiErrorCode.INTERNAL_ERROR, locale)
           : message,
     },
-  });
+    500
+  );
 }

@@ -9,10 +9,12 @@
   "scripts": {
     "build": "turbo run build --filter=@logx/api... --filter=@logx/web...",
     "dev": "turbo run dev",
-    "lint": "turbo run lint --filter=@logx/api... --filter=@logx/web...",
+    "lint": "turbo run lint --filter=@logx/api... --filter=@logx/web... --filter=@logx/mobile",
     "lint:fix": "turbo run lint:fix --filter=@logx/api... --filter=@logx/web...",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .prettierignore",
-    "type-check": "turbo run type-check --filter=@logx/api... --filter=@logx/web...",
+    "type-check": "turbo run type-check --filter=@logx/api... --filter=@logx/web... --filter=@logx/mobile",
+    "test:i18n": "npm run test --workspace=@logx/i18n",
+    "verify": "npm run test:i18n && npm run lint && npm run type-check && npm run build",
     "clean": "turbo run clean"
   },
   "overrides": {

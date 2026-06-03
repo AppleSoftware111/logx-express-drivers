@@ -3,8 +3,8 @@ version: '3.9'
 services:
   api:
     build:
-      context: ./apps/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/api/Dockerfile
     ports:
       - '4000:4000'
     environment:
@@ -23,9 +23,13 @@ services:
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
       - CORS_ORIGINS=${CORS_ORIGINS}
+      - APP_TIMEZONE=${APP_TIMEZONE:-America/Sao_Paulo}
       - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER}
       - ZAPI_INSTANCE_ID=${ZAPI_INSTANCE_ID}
       - ZAPI_TOKEN=${ZAPI_TOKEN}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
     depends_on:
       - redis
     restart: unless-stopped
@@ -34,8 +38,8 @@ services:
 
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - NEXT_PUBLIC_GOOGLE_MAPS_KEY=${GOOGLE_MAPS_API_KEY}

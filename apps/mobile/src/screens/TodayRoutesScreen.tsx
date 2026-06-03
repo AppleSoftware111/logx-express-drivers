@@ -118,7 +118,7 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
       ) : (
         <FlatList
           data={data}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item: Execution) => item._id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={

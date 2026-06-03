@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Power, Truck, Users } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 import type { CreateDriverInput, UpdateDriverInput } from '@logx/shared';
 
@@ -34,7 +34,7 @@ interface Vehicle {
 
 export default function DriversPage() {
   const t = useTranslations('drivers');
-  const tCommon = useTranslations('common');
+  const locale = useLocale();
   const sessionReady = useHasAccessToken();
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -177,7 +177,7 @@ export default function DriversPage() {
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Add Driver
+              {t('addDriver')}
             </button>
           }
         />
@@ -249,7 +249,10 @@ export default function DriversPage() {
             {driver.isOnline && driver.currentLocation && (
               <div className="mt-2 text-xs text-green-600">
                 {t('lastSeen')}:{' '}
-                {new Date(driver.currentLocation.updatedAt).toLocaleTimeString('pt-BR')}
+                {new Intl.DateTimeFormat(locale === 'pt' ? 'pt-BR' : locale, {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(new Date(driver.currentLocation.updatedAt))}
               </div>
             )}
           </div>

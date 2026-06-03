@@ -16,6 +16,7 @@ export interface IUser extends Document {
   passwordHash: string;
   role: UserRole;
   locale: SupportedLocale;
+  localeUpdatedAt?: Date | null;
   refreshTokens: IRefreshToken[];
   isActive: boolean;
   createdAt: Date;
@@ -47,6 +48,7 @@ const userSchema = new Schema<IUser>(
       enum: ['pt', 'es', 'en'],
       default: 'pt',
     },
+    localeUpdatedAt: { type: Date, default: null },
     refreshTokens: { type: [refreshTokenSchema], default: [] },
     isActive: { type: Boolean, default: true },
   },
