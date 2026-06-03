@@ -73,7 +73,6 @@ export default function DriversPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['drivers'] });
       setDialogOpen(false);
-      setEditingDriver(null);
     },
   });
 
@@ -88,7 +87,6 @@ export default function DriversPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['drivers'] });
       setDialogOpen(false);
-      setEditingDriver(null);
     },
   });
 
@@ -260,6 +258,7 @@ export default function DriversPage() {
       </div>
 
       <DriverFormDialog
+        key={editingDriver?._id ?? 'create-driver'}
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);

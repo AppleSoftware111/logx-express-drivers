@@ -61,7 +61,6 @@ export default function ClientsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['clients'] });
       setDialogOpen(false);
-      setEditingClient(null);
     },
   });
 
@@ -76,7 +75,6 @@ export default function ClientsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['clients'] });
       setDialogOpen(false);
-      setEditingClient(null);
     },
   });
 
@@ -232,6 +230,7 @@ export default function ClientsPage() {
       </div>
 
       <ClientFormDialog
+        key={editingClient?._id ?? 'create-client'}
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
