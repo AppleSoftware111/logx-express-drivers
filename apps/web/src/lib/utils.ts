@@ -17,18 +17,20 @@ export function formatDate(
   locale: SupportedLocale = 'pt'
 ): string {
   if (format === 'dd/MM/yyyy') {
-    return formatDateByLocale(date, locale, {
+    const formatted = formatDateByLocale(date, locale, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     });
+
+    return formatted || '-';
   }
 
   if (format === 'dd/MM/yyyy HH:mm') {
-    return formatDateTimeByLocale(date, locale);
+    return formatDateTimeByLocale(date, locale) || '-';
   }
 
-  return formatDateByLocale(date, locale);
+  return formatDateByLocale(date, locale) || '-';
 }
 
 export function formatDateTime(date: Date | string, locale: SupportedLocale = 'pt'): string {

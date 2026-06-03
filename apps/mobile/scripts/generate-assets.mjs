@@ -1,5 +1,7 @@
 /**
- * Generates Expo app icons and splash from assets/icon.svg
+ * Generates Expo app icons and splash assets.
+ * - Icons come from assets/icon.svg
+ * - Splash uses assets/splash-logo.svg so it can stay transparent and tightly cropped
  * Run: node scripts/generate-assets.mjs
  */
 import fs from 'fs';
@@ -8,8 +10,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.join(__dirname, '..', 'assets');
-const svgPath = path.join(assetsDir, 'icon.svg');
-const svg = fs.readFileSync(svgPath);
+const iconSvgPath = path.join(assetsDir, 'icon.svg');
+const splashSvgPath = path.join(assetsDir, 'splash-logo.svg');
+const iconSvg = fs.readFileSync(iconSvgPath);
+const splashSvg = fs.readFileSync(splashSvgPath);
 
 let sharp;
 try {
@@ -19,7 +23,7 @@ try {
   process.exit(1);
 }
 
-const icon1024 = await sharp(svg).resize(1024, 1024).png().toBuffer();
+const icon1024 = await sharp(iconSvg).resize(1024, 1024).png().toBuffer();
 await sharp(icon1024).toFile(path.join(assetsDir, 'icon.png'));
 console.log('Wrote assets/icon.png (1024)');
 
@@ -28,8 +32,14 @@ console.log('Wrote assets/adaptive-icon.png (1024)');
 
 const splashW = 1284;
 const splashH = 2778;
-const logoSize = 280;
-const logo = await sharp(svg).resize(logoSize, logoSize).png().toBuffer();
+const splashLogoWidth = 760;
+const logo = await sharp(splashSvg)
+  .resize({
+    width: splashLogoWidth,
+    withoutEnlargement: false,
+  })
+  .png()
+  .toBuffer();
 
 const splash = await sharp({
   create: {

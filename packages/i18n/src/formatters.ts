@@ -3,8 +3,18 @@ import { localeToIntl } from './locales';
 
 type FormatInput = Date | string | number;
 
-function normalizeDate(value: FormatInput): Date {
-  return value instanceof Date ? value : new Date(value);
+function normalizeDate(value: FormatInput): Date | null {
+  if (typeof value === 'string' && value.trim().length === 0) {
+    return null;
+  }
+
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function formatDateByLocale(
@@ -12,7 +22,13 @@ export function formatDateByLocale(
   locale: SupportedLocale,
   options?: Intl.DateTimeFormatOptions
 ): string {
-  return new Intl.DateTimeFormat(localeToIntl(locale), options).format(normalizeDate(value));
+  const date = normalizeDate(value);
+
+  if (!date) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat(localeToIntl(locale), options).format(date);
 }
 
 export function formatDateTimeByLocale(

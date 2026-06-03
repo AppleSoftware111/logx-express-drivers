@@ -12,6 +12,8 @@
     "generate:assets": "node scripts/generate-assets.mjs",
     "build:apk:cloud": "eas build --platform android --profile preview",
     "build:apk:local": "eas build --platform android --profile preview --local",
+    "build:apk:standalone": "expo prebuild --platform android --clean && cd android && gradlew.bat :app:assembleRelease --no-daemon --max-workers=1",
+    "build:apk:standalone:ldplayer": "expo prebuild --platform android --clean && cd android && gradlew.bat :app:assembleRelease --no-daemon --max-workers=1 -PreactNativeArchitectures=x86_64",
     "build:aab:cloud": "eas build --platform android --profile production",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",

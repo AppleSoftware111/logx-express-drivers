@@ -30,5 +30,7 @@ assert.equal(
   'You arrived at Lab 1'
 );
 assert.notEqual(formatDateTimeByLocale('2026-06-01T10:30:00Z', 'pt'), formatDateTimeByLocale('2026-06-01T10:30:00Z', 'en'));
+assert.equal(formatDateTimeByLocale('', 'pt'), '');
+assert.equal(formatDateTimeByLocale('undefinedT00:00:00', 'en'), '');
 
 console.log('i18n unit checks passed');
