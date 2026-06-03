@@ -1,4 +1,4 @@
-import { create, post } from 'axios';
+import axios, { create } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
@@ -56,7 +56,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const res = await post(`${API_URL}/api/auth/refresh`, {}, {
+        const res = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
           withCredentials: true,
         });
         const newToken = res.data.data?.accessToken;

@@ -38,13 +38,13 @@ interface Props {
   onComplete?: (ctx: CompletionContext) => void;
 }
 
-type View = 'route' | 'stop' | 'pod';
+type RouteDetailView = 'route' | 'stop' | 'pod';
 
 export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>('route');
+  const [view, setView] = useState<RouteDetailView>('route');
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
 
