@@ -282,7 +282,7 @@ jobs:
   smoke-test:
     name: Smoke test deployed services
     needs: [changes, deploy-api, deploy-web]
-    if: ${{ always() && (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') && needs.deploy-api.result != 'failure' && needs.deploy-web.result != 'failure' }}
+    if: ${{ always() && (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') && needs['deploy-api'].result != 'failure' && needs['deploy-web'].result != 'failure' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'production' }}
     steps:
@@ -306,7 +306,7 @@ jobs:
   invalidate-cloudfront:
     name: Invalidate CloudFront cache
     needs: [changes, deploy-web, smoke-test]
-    if: ${{ needs.changes.outputs.web == 'true' && needs.deploy-web.result == 'success' && needs.smoke-test.result == 'success' && env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+    if: ${{ needs.changes.outputs.web == 'true' && needs['deploy-web'].result == 'success' && needs['smoke-test'].result == 'success' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'production' }}
     steps:
