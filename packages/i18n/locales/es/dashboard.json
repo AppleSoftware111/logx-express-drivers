@@ -14,6 +14,7 @@
   "unreadAlerts": "Alertas no leídos",
   "liveDriverLocations": "Ubicación de los conductores",
   "recentAlerts": "Alertas recientes",
+  "noAlerts": "Sin alertas",
   "activeExecutions": "Ejecuciones activas",
   "noActiveExecutions": "No hay ejecuciones activas en este momento"
 }

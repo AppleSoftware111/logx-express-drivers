@@ -14,6 +14,7 @@
   "unreadAlerts": "Unread alerts",
   "liveDriverLocations": "Driver locations",
   "recentAlerts": "Recent alerts",
+  "noAlerts": "No alerts",
   "activeExecutions": "Active executions",
   "noActiveExecutions": "No active executions right now"
 }
