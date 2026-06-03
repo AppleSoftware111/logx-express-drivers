@@ -36,27 +36,55 @@ env:
   FRONTEND_URL: ${{ vars.FRONTEND_URL }}
   CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
   APP_TIMEZONE: ${{ vars.APP_TIMEZONE || 'America/Sao_Paulo' }}
+  ECS_HEALTH_GRACE_PERIOD_WEB: ${{ vars.ECS_HEALTH_GRACE_PERIOD_WEB || '120' }}
   S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME || 'my-website-bucket' }}
   CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID || 'ECN1RSCDU3H3U' }}
 
 jobs:
-  deploy:
-    name: Build, push and deploy ECS services
+  changes:
+    name: Detect deploy scope
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api:
+              - '.github/workflows/deploy-aws.yml'
+              - '.dockerignore'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'apps/api/**'
+              - 'packages/shared/**'
+              - 'packages/i18n/**'
+              - 'packages/tsconfig/**'
+            web:
+              - '.github/workflows/deploy-aws.yml'
+              - '.dockerignore'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'apps/web/**'
+              - 'packages/shared/**'
+              - 'packages/i18n/**'
+              - 'packages/tsconfig/**'
+
+  deploy-api:
+    name: Build and deploy API
+    needs: changes
+    if: ${{ needs.changes.outputs.api == 'true' }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'production' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -65,41 +93,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push API image
-        id: build-api
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          API_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG"
-          docker build -f apps/api/Dockerfile -t "$API_IMAGE" .
-          docker push "$API_IMAGE"
-          echo "image=$API_IMAGE" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push Web image
-        id: build-web
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          WEB_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG"
-          docker build \
-            -f apps/web/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-            --build-arg NEXT_PUBLIC_GOOGLE_MAPS_KEY="$NEXT_PUBLIC_GOOGLE_MAPS_KEY" \
-            -t "$WEB_IMAGE" .
-          docker push "$WEB_IMAGE"
-          echo "image=$WEB_IMAGE" >> "$GITHUB_OUTPUT"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }}
+          cache-from: type=gha,scope=deploy-api
+          cache-to: type=gha,mode=max,scope=deploy-api
 
       - name: Deploy API service
         env:
-          NEW_IMAGE: ${{ steps.build-api.outputs.image }}
+          NEW_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ github.sha }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -115,7 +129,7 @@ jobs:
           aws ecs describe-task-definition --task-definition "$SERVICE_TASK_DEF_ARN" \
             --query 'taskDefinition' > task-def-api.json
 
-          cat task-def-api.json | jq \
+          jq \
             --arg IMAGE "$NEW_IMAGE" \
             --arg NAME "$ECS_CONTAINER_API" \
             --arg MONGODB_URI "$MONGODB_URI" \
@@ -154,7 +168,7 @@ jobs:
               .registeredAt,
               .registeredBy
             )
-            ' > task-def-api-updated.json
+            ' task-def-api.json > task-def-api-updated.json
 
           NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
             --cli-input-json file://task-def-api-updated.json \
@@ -170,9 +184,48 @@ jobs:
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE_API"
 
+  deploy-web:
+    name: Build and deploy Web
+    needs: changes
+    if: ${{ needs.changes.outputs.web == 'true' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ env.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_GOOGLE_MAPS_KEY=${{ env.NEXT_PUBLIC_GOOGLE_MAPS_KEY }}
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_WEB }}:${{ github.sha }}
+          cache-from: type=gha,scope=deploy-web
+          cache-to: type=gha,mode=max,scope=deploy-web
+
       - name: Deploy Web service
         env:
-          NEW_IMAGE: ${{ steps.build-web.outputs.image }}
+          NEW_IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_WEB }}:${{ github.sha }}
         run: |
           set -euo pipefail
           SERVICE_TASK_DEF_ARN="$(aws ecs describe-services \
@@ -184,7 +237,7 @@ jobs:
           aws ecs describe-task-definition --task-definition "$SERVICE_TASK_DEF_ARN" \
             --query 'taskDefinition' > task-def-web.json
 
-          cat task-def-web.json | jq \
+          jq \
             --arg IMAGE "$NEW_IMAGE" \
             --arg NAME "$ECS_CONTAINER_WEB" \
             '
@@ -209,7 +262,7 @@ jobs:
               .registeredAt,
               .registeredBy
             )
-            ' > task-def-web-updated.json
+            ' task-def-web.json > task-def-web-updated.json
 
           NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
             --cli-input-json file://task-def-web-updated.json \
@@ -219,24 +272,52 @@ jobs:
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE_WEB" \
-            --task-definition "$NEW_TASK_DEF_ARN"
+            --task-definition "$NEW_TASK_DEF_ARN" \
+            --health-check-grace-period-seconds "$ECS_HEALTH_GRACE_PERIOD_WEB"
 
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
             --services "$ECS_SERVICE_WEB"
 
+  smoke-test:
+    name: Smoke test deployed services
+    needs: [changes, deploy-api, deploy-web]
+    if: ${{ always() && (needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true') && needs.deploy-api.result != 'failure' && needs.deploy-web.result != 'failure' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
       - name: Smoke test deployed services
         run: |
           set -euo pipefail
 
-          curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
-            "${NEXT_PUBLIC_API_URL%/}/health"
+          if [ "${{ needs.changes.outputs.api }}" = "true" ]; then
+            curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+              "${NEXT_PUBLIC_API_URL%/}/health"
+          fi
 
-          curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
-            "${FRONTEND_URL%/}/login"
+          if [ "${{ needs.changes.outputs.web }}" = "true" ]; then
+            curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+              "${FRONTEND_URL%/}/api/health"
+
+            curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
+              "${FRONTEND_URL%/}/login"
+          fi
+
+  invalidate-cloudfront:
+    name: Invalidate CloudFront cache
+    needs: [changes, deploy-web, smoke-test]
+    if: ${{ needs.changes.outputs.web == 'true' && needs.deploy-web.result == 'success' && needs.smoke-test.result == 'success' && env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Invalidate CloudFront cache
-        if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
