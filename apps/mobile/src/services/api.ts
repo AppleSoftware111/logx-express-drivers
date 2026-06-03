@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { create, post } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
@@ -30,7 +30,7 @@ function resolveApiUrl(): string {
 
 export const API_URL = resolveApiUrl();
 
-export const apiClient = axios.create({
+export const apiClient = create({
   baseURL: `${API_URL}/api`,
   timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
@@ -56,7 +56,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const res = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
+        const res = await post(`${API_URL}/api/auth/refresh`, {}, {
           withCredentials: true,
         });
         const newToken = res.data.data?.accessToken;

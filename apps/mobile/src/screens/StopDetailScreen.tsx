@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -34,11 +34,10 @@ interface Stop {
 interface Props {
   executionId: string;
   stop: Stop;
-  onComplete: () => void;
   onOpenPOD: () => void;
 }
 
-export function StopDetailScreen({ executionId, stop, onComplete, onOpenPOD }: Props) {
+export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
   const queryClient = useQueryClient();

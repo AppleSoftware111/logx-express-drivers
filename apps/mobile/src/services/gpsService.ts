@@ -1,8 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
-import { SOCKET_EVENTS } from '@logx/shared';
-
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';

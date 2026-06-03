@@ -123,7 +123,6 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         <StopDetailScreen
           executionId={executionId}
           stop={selectedStop}
-          onComplete={() => setView('route')}
           onOpenPOD={() => setView('pod')}
         />
       </View>
