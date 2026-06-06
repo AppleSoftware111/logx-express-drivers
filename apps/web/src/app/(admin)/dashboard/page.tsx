@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, Clock, Truck, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
@@ -34,6 +34,39 @@ interface DashboardSummary {
     routeId: { name: string };
     driverId: { name: string; isOnline: boolean; currentLocation?: { lat: number; lng: number } };
   }>;
+}
+
+interface LiveDriver {
+  _id: string;
+  name: string;
+  currentLocation?: { lat: number; lng: number; updatedAt?: string };
+  vehicleId?: { plate: string; type: string };
+}
+
+const DEFAULT_DASHBOARD_CENTER = { lat: -14.235, lng: -51.9253 };
+
+function DriverMapAutoFit({
+  points,
+}: {
+  points: Array<{ lat: number; lng: number }>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length === 0 || typeof google === 'undefined') return;
+
+    if (points.length === 1) {
+      map.setCenter(points[0]);
+      map.setZoom(14);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    points.forEach((point) => bounds.extend(point));
+    map.fitBounds(bounds, 72);
+  }, [map, points]);
+
+  return null;
 }
 
 function SummaryCard({
@@ -85,12 +118,7 @@ export default function DashboardPage() {
     queryFn: async () => {
       const res = await apiClient.get<{
         success: boolean;
-        data: Array<{
-          _id: string;
-          name: string;
-          currentLocation?: { lat: number; lng: number };
-          vehicleId?: { plate: string; type: string };
-        }>;
+        data: LiveDriver[];
       }>('/dashboard/live-drivers');
       return res.data.data;
     },
@@ -114,6 +142,25 @@ export default function DashboardPage() {
       socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handler);
     };
   }, [socket]);
+  const summary = data?.cards;
+  const liveDrivers = useMemo(
+    () =>
+      (driversData ?? []).filter(
+        (driver) =>
+          typeof driver.currentLocation?.lat === 'number' &&
+          typeof driver.currentLocation?.lng === 'number'
+      ),
+    [driversData]
+  );
+  const mapPoints = useMemo(
+    () =>
+      liveDrivers.map((driver) => ({
+        lat: driver.currentLocation!.lat,
+        lng: driver.currentLocation!.lng,
+      })),
+    [liveDrivers]
+  );
+  const mapCenter = mapPoints[0] ?? DEFAULT_DASHBOARD_CENTER;
 
   if (isLoading) {
     return (
@@ -122,8 +169,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  const summary = data?.cards;
 
   return (
     <div className="p-6 space-y-6">
@@ -172,35 +217,69 @@ export default function DashboardPage() {
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900">{t('liveDriverLocations')}</h2>
           </div>
-          <div className="h-[420px]">
-            <GoogleMapsProvider className="h-full w-full">
-              <Map
-                defaultCenter={{ lat: -23.5505, lng: -46.6333 }}
-                defaultZoom={11}
-                mapId="logx-dashboard-map"
-                gestureHandling="greedy"
-              >
-                {driversData
-                  ?.filter((d) => d.currentLocation)
-                  .map((driver) => (
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="h-[420px]">
+              <GoogleMapsProvider className="h-full w-full">
+                <Map
+                  defaultCenter={DEFAULT_DASHBOARD_CENTER}
+                  center={mapCenter}
+                  defaultZoom={11}
+                  mapId="logx-dashboard-map"
+                  gestureHandling="greedy"
+                >
+                  <DriverMapAutoFit points={mapPoints} />
+                  {liveDrivers.map((driver) => (
                     <AdvancedMarker
                       key={driver._id}
                       position={{
                         lat: driver.currentLocation!.lat,
                         lng: driver.currentLocation!.lng,
                       }}
-                      title={`${driver.name} — ${driver.vehicleId?.plate ?? ''}`}
+                      title={`${driver.name} — ${driver.vehicleId?.plate ?? t('vehicleUnknown')}`}
                     >
-                      <Pin
-                        background="#2563eb"
-                        borderColor="#1d4ed8"
-                        glyphColor="#fff"
-                        scale={1.2}
-                      />
+                      <div className="drop-shadow-sm">
+                        <Pin
+                          background="#2563eb"
+                          borderColor="#1d4ed8"
+                          glyphColor="#fff"
+                          scale={1.2}
+                        />
+                      </div>
                     </AdvancedMarker>
                   ))}
-              </Map>
-            </GoogleMapsProvider>
+                </Map>
+              </GoogleMapsProvider>
+            </div>
+
+            <div className="border-t border-gray-100 xl:border-l xl:border-t-0">
+              <div className="px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {t('driversOnMap', { count: liveDrivers.length })}
+                </p>
+              </div>
+              <div className="max-h-[420px] divide-y divide-gray-100 overflow-auto">
+                {liveDrivers.length === 0 ? (
+                  <div className="px-4 py-6 text-sm text-gray-400">{t('noDriverLocations')}</div>
+                ) : (
+                  liveDrivers.map((driver) => (
+                    <div key={driver._id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-gray-900">{driver.name}</p>
+                          <p className="truncate text-xs text-gray-500">
+                            {driver.vehicleId?.plate ?? t('vehicleUnknown')}
+                          </p>
+                        </div>
+                        <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                      </div>
+                      <p className="mt-2 font-mono text-xs text-gray-600">
+                        {driver.currentLocation!.lat.toFixed(5)}, {driver.currentLocation!.lng.toFixed(5)}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

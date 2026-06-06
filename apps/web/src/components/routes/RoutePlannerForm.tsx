@@ -2,8 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import type { FieldErrors } from 'react-hook-form';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -156,6 +157,11 @@ interface RoutePlannerFormProps {
   onCancel: () => void;
 }
 
+type ValidationIssue = {
+  path: string;
+  message: string;
+};
+
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -209,6 +215,45 @@ function normalizePayload(values: RouteFormValues): CreateRouteInput {
       instructions: stop.instructions?.trim() || undefined,
     })),
   };
+}
+
+function collectValidationIssues(
+  errors: FieldErrors<RouteFormValues>,
+  prefix = ''
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const [key, value] of Object.entries(errors)) {
+    if (key === 'ref' || key === 'type' || key === 'types') continue;
+    if (!value) continue;
+
+    const path = prefix ? `${prefix}.${key}` : key;
+
+    if (typeof value === 'object' && value !== null && 'message' in value && typeof value.message === 'string') {
+      issues.push({ path, message: value.message });
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        if (item && typeof item === 'object') {
+          issues.push(...collectValidationIssues(item as FieldErrors<RouteFormValues>, `${path}.${index}`));
+        }
+      });
+      continue;
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      issues.push(...collectValidationIssues(value as FieldErrors<RouteFormValues>, path));
+    }
+  }
+
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = `${issue.path}:${issue.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function routeDetailToFormValues(route: {
@@ -322,6 +367,9 @@ export function RoutePlannerForm({
 }: RoutePlannerFormProps) {
   const t = useTranslations('routes');
   const isEdit = mode === 'edit';
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const validationSummaryRef = useRef<HTMLDivElement | null>(null);
+  const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const {
     register,
     handleSubmit,
@@ -335,8 +383,10 @@ export function RoutePlannerForm({
   });
 
   const recurrenceType = useWatch({ control, name: 'recurrenceType' });
-  const daysOfWeek = useWatch({ control, name: 'daysOfWeek' }) ?? [];
-  const stops = useWatch({ control, name: 'stops' }) ?? [];
+  const watchedDaysOfWeek = useWatch({ control, name: 'daysOfWeek' });
+  const watchedStops = useWatch({ control, name: 'stops' });
+  const daysOfWeek = useMemo(() => watchedDaysOfWeek ?? [], [watchedDaysOfWeek]);
+  const stops = useMemo(() => watchedStops ?? [], [watchedStops]);
   const customerId = useWatch({ control, name: 'clientId' });
 
   useEffect(() => {
@@ -345,11 +395,18 @@ export function RoutePlannerForm({
     } else {
       reset(defaultValues);
     }
+    setValidationIssues([]);
   }, [initial, reset]);
 
   useEffect(() => {
     setValue('scheduledTime', getRouteStartTime(stops), { shouldDirty: true });
   }, [setValue, stops]);
+
+  useEffect(() => {
+    if (validationIssues.length > 0) {
+      setValidationIssues(collectValidationIssues(errors));
+    }
+  }, [errors, validationIssues.length]);
 
   const toggleDay = (day: number) => {
     const next = daysOfWeek.includes(day)
@@ -376,8 +433,68 @@ export function RoutePlannerForm({
     'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100';
   const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700';
 
+  const scrollToValidationIssue = (path?: string) => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const sanitizedPath = path?.replace(/\.root$/, '');
+    const selectorPath = sanitizedPath
+      ? sanitizedPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      : '';
+
+    const target = selectorPath
+      ? form.querySelector<HTMLElement>(`[name="${selectorPath}"], [data-field="${selectorPath}"]`)
+      : null;
+
+    const fallbackTarget = validationSummaryRef.current;
+    const element = target ?? fallbackTarget;
+
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement
+    ) {
+      target.focus();
+    }
+  };
+
+  const handleValidSubmit = (values: RouteFormValues) => {
+    setValidationIssues([]);
+    onSubmit(normalizePayload(values));
+  };
+
+  const handleInvalidSubmit = (formErrors: FieldErrors<RouteFormValues>) => {
+    const issues = collectValidationIssues(formErrors);
+    setValidationIssues(issues);
+    window.requestAnimationFrame(() => {
+      scrollToValidationIssue(issues[0]?.path);
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit((values) => onSubmit(normalizePayload(values)))} className="space-y-6">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit(handleValidSubmit, handleInvalidSubmit)}
+      className="space-y-6"
+    >
+      {validationIssues.length > 0 && (
+        <div
+          ref={validationSummaryRef}
+          className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+        >
+          <p className="text-sm font-semibold text-amber-900">{t('validationSummaryTitle')}</p>
+          <p className="mt-1 text-sm text-amber-800">{t('validationSummaryBody')}</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-amber-900">
+            {validationIssues.slice(0, 5).map((issue) => (
+              <li key={`${issue.path}:${issue.message}`}>{issue.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_420px]">
         <div className="space-y-6">
           <section className={sectionClass}>
@@ -515,7 +632,7 @@ export function RoutePlannerForm({
             </div>
 
             {(recurrenceType === 'WEEKLY' || recurrenceType === 'CUSTOM') && (
-              <div className="mt-5">
+              <div className="mt-5" data-field="daysOfWeek">
                 <label className={labelClass}>{t('daysOfWeek')} *</label>
                 <div className="flex flex-wrap gap-2">
                   {DAY_OPTIONS.map((day) => (
@@ -576,13 +693,15 @@ export function RoutePlannerForm({
             )}
           </section>
 
-          <RouteStopsEditor
-            control={control}
-            register={register}
-            setValue={setValue}
-            errors={errors}
-            clients={clients}
-          />
+          <div data-field="stops">
+            <RouteStopsEditor
+              control={control}
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              clients={clients}
+            />
+          </div>
 
           {submitError != null && (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-4">

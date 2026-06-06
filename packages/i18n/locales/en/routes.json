@@ -53,6 +53,8 @@
   "instructions": "Instructions",
   "instructionsPlaceholder": "Optional operational notes for this stop",
   "planningSummary": "Planning summary",
+  "validationSummaryTitle": "Review the highlighted fields before saving.",
+  "validationSummaryBody": "The route could not be saved yet because some required information is missing or invalid.",
   "notSelected": "Not selected",
   "firstStop": "First stop",
   "lastStop": "Last stop",

@@ -53,6 +53,8 @@
   "instructions": "Instruções",
   "instructionsPlaceholder": "Observações operacionais opcionais para esta parada",
   "planningSummary": "Resumo do planejamento",
+  "validationSummaryTitle": "Revise os campos destacados antes de salvar.",
+  "validationSummaryBody": "A rota ainda não pôde ser salva porque faltam informações obrigatórias ou existe algum valor inválido.",
   "notSelected": "Não selecionado",
   "firstStop": "Primeira parada",
   "lastStop": "Última parada",

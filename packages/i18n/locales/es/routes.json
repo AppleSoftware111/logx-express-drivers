@@ -53,6 +53,8 @@
   "instructions": "Instrucciones",
   "instructionsPlaceholder": "Notas operativas opcionales para esta parada",
   "planningSummary": "Resumen de planificación",
+  "validationSummaryTitle": "Revise los campos resaltados antes de guardar.",
+  "validationSummaryBody": "La ruta todavía no se puede guardar porque falta información obligatoria o hay algún valor no válido.",
   "notSelected": "No seleccionado",
   "firstStop": "Primera parada",
   "lastStop": "Última parada",
