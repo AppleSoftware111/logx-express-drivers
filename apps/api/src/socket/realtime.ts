@@ -39,7 +39,7 @@ export function emitDriverLocationUpdate(
   companyId: string,
   payload: {
     driverId: string;
-    executionId: string;
+    executionId?: string;
     lat: number;
     lng: number;
     speed?: number;

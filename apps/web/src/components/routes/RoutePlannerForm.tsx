@@ -44,6 +44,12 @@ const MONTH_OPTIONS = [
   { value: 12, label: 'December' },
 ];
 
+const optionalPositiveInt = (min: number, max: number) =>
+  z.preprocess(
+    (value) => (value === '' || value === null || value === undefined ? undefined : value),
+    z.coerce.number().int().min(min).max(max).optional()
+  );
+
 const routeFormSchema = z
   .object({
     clientId: z.string().min(1, 'Select a customer'),
@@ -54,8 +60,8 @@ const routeFormSchema = z
       .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use HH:mm format (e.g. 08:30)"),
     recurrenceType: z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY', 'CUSTOM']),
     daysOfWeek: z.array(z.number().int().min(0).max(6)),
-    dayOfMonth: z.coerce.number().int().min(1).max(31).optional(),
-    monthOfYear: z.coerce.number().int().min(1).max(12).optional(),
+    dayOfMonth: optionalPositiveInt(1, 31),
+    monthOfYear: optionalPositiveInt(1, 12),
     recurrenceStartDate: z.string().min(1, 'Choose a recurrence start date'),
     recurrenceEndDate: z.string().optional(),
     isTemplate: z.boolean(),
@@ -301,8 +307,8 @@ export function routeDetailToFormValues(route: {
     scheduledTime: route.scheduledTime,
     recurrenceType: route.recurrenceType as RouteFormValues['recurrenceType'],
     daysOfWeek: route.daysOfWeek ?? [],
-    dayOfMonth: route.dayOfMonth,
-    monthOfYear: route.monthOfYear,
+    dayOfMonth: route.dayOfMonth ?? undefined,
+    monthOfYear: route.monthOfYear ?? undefined,
     recurrenceStartDate: route.recurrenceStartDate?.slice(0, 10) ?? todayDateString(),
     recurrenceEndDate: route.recurrenceEndDate?.slice(0, 10) ?? '',
     isTemplate: route.isTemplate ?? false,

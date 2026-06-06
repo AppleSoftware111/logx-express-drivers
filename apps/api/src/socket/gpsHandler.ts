@@ -98,6 +98,37 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
     }
   );
 
+  socket.on(
+    SOCKET_EVENTS.DRIVER_PRESENCE_LOCATION,
+    async (payload: {
+      lat: number;
+      lng: number;
+      speed?: number;
+      heading?: number;
+      accuracy?: number;
+      recordedAt?: string;
+    }) => {
+      if (!driverId) return;
+
+      try {
+        await updateDriverLocation(driverId, payload.lat, payload.lng);
+
+        emitDriverLocationUpdate(companyId, {
+          driverId,
+          lat: payload.lat,
+          lng: payload.lng,
+          speed: payload.speed,
+          heading: payload.heading,
+          accuracy: payload.accuracy,
+          timestamp: payload.recordedAt ?? new Date().toISOString(),
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[gpsHandler] Error processing presence location:', msg);
+      }
+    }
+  );
+
   socket.on(SOCKET_EVENTS.DRIVER_ONLINE, async () => {
     if (!driverId) return;
     await Driver.findByIdAndUpdate(driverId, { isOnline: true });

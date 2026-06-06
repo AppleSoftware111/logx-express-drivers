@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { useAuthStore } from '../stores/authStore';
+import { getCurrentLocation } from '../services/gpsService';
 import { useSocketStore } from '../stores/socketStore';
 
 type DriverRouteRealtimePayload = {
@@ -36,6 +37,20 @@ export function useDriverRealtime() {
   useEffect(() => {
     if (!socket || !isAuthenticated) return;
 
+    const emitPresenceLocation = async () => {
+      const location = await getCurrentLocation();
+      if (!location) return;
+
+      socket.emit(SOCKET_EVENTS.DRIVER_PRESENCE_LOCATION, {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        speed: location.coords.speed ?? undefined,
+        heading: location.coords.heading ?? undefined,
+        accuracy: location.coords.accuracy ?? undefined,
+        recordedAt: new Date(location.timestamp).toISOString(),
+      });
+    };
+
     const invalidateExecutionState = (payload?: DriverRouteRealtimePayload) => {
       void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
 
@@ -47,6 +62,7 @@ export function useDriverRealtime() {
 
     const handleConnect = () => {
       socket.emit(SOCKET_EVENTS.DRIVER_ONLINE);
+      void emitPresenceLocation();
       invalidateExecutionState();
     };
 
@@ -59,6 +75,8 @@ export function useDriverRealtime() {
 
       if (!socket.connected) {
         socket.connect();
+      } else {
+        void emitPresenceLocation();
       }
 
       invalidateExecutionState();

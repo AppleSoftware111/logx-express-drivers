@@ -31,6 +31,7 @@ export const SOCKET_ROOMS = {
 export const SOCKET_EVENTS = {
   // Driver → Server
   DRIVER_LOCATION: 'driver:location',
+  DRIVER_PRESENCE_LOCATION: 'driver:presence_location',
   DRIVER_ONLINE: 'driver:online',
   DRIVER_OFFLINE: 'driver:offline',
   // Server → Admin
