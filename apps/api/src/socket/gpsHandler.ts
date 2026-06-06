@@ -1,11 +1,12 @@
 import type { Server, Socket } from 'socket.io';
 
 import { DEFAULT_LOCALE, formatMessage } from '@logx/i18n';
-import { SOCKET_EVENTS } from '@logx/shared';
+import { SOCKET_EVENTS, SOCKET_ROOMS } from '@logx/shared';
 
 import { Driver } from '../models/Driver.model';
 import { User } from '../models/User.model';
 import { checkGeofenceArrivals, bufferGpsPoint, updateDriverLocation } from '../modules/tracking/tracking.service';
+import { emitDriverLocationUpdate, emitExecutionRealtimeUpdate } from './realtime';
 
 export function registerGpsHandlers(io: Server, socket: Socket): void {
   const { driverId, companyId, userId } = socket.data as {
@@ -45,15 +46,15 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
         // Update driver's latest position in DB
         await updateDriverLocation(driverId, payload.lat, payload.lng);
 
-        // Broadcast to admin room
-        io.to(`admin:${companyId}`).emit(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, {
+        emitDriverLocationUpdate(companyId, {
           driverId,
           executionId: payload.executionId,
           lat: payload.lat,
           lng: payload.lng,
           speed: payload.speed,
           heading: payload.heading,
-          timestamp: payload.recordedAt,
+          accuracy: payload.accuracy,
+          timestamp: payload.recordedAt ?? new Date().toISOString(),
         });
 
         // Check geofence for auto-arrival
@@ -81,12 +82,13 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
             ),
           });
 
-          // Notify admin
-          io.to(`admin:${companyId}`).emit(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, {
+          emitExecutionRealtimeUpdate(companyId, {
             executionId: arrival.executionId,
             event: 'STOP_ARRIVED',
             stopId: arrival.stopId,
             clientName: arrival.clientName,
+            driverId,
+            timestamp: new Date().toISOString(),
           });
         }
       } catch (err) {
@@ -99,18 +101,27 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
   socket.on(SOCKET_EVENTS.DRIVER_ONLINE, async () => {
     if (!driverId) return;
     await Driver.findByIdAndUpdate(driverId, { isOnline: true });
-    io.to(`admin:${companyId}`).emit(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, {
+    emitExecutionRealtimeUpdate(companyId, {
       event: 'DRIVER_ONLINE',
       driverId,
+      timestamp: new Date().toISOString(),
     });
   });
 
   socket.on('disconnect', async () => {
     if (!driverId) return;
+
+    const remainingConnections =
+      io.sockets.adapter.rooms.get(SOCKET_ROOMS.driverRoom(driverId))?.size ?? 0;
+    if (remainingConnections > 0) {
+      return;
+    }
+
     await Driver.findByIdAndUpdate(driverId, { isOnline: false });
-    io.to(`admin:${companyId}`).emit(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, {
+    emitExecutionRealtimeUpdate(companyId, {
       event: 'DRIVER_OFFLINE',
       driverId,
+      timestamp: new Date().toISOString(),
     });
   });
 }

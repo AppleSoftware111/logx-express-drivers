@@ -32,7 +32,12 @@ interface DashboardSummary {
     delayMinutes: number;
     scheduledTime: string;
     routeId: { name: string };
-    driverId: { name: string; isOnline: boolean; currentLocation?: { lat: number; lng: number } };
+    driverId: {
+      _id: string;
+      name: string;
+      isOnline: boolean;
+      currentLocation?: { lat: number; lng: number; updatedAt?: string };
+    };
   }>;
 }
 
@@ -43,7 +48,40 @@ interface LiveDriver {
   vehicleId?: { plate: string; type: string };
 }
 
+interface AdminDriverLocationPayload {
+  driverId: string;
+  lat: number;
+  lng: number;
+  executionId: string;
+  timestamp?: string;
+}
+
+interface AdminExecutionUpdatePayload {
+  event: string;
+  executionId?: string;
+  driverId?: string;
+  status?: string;
+  timestamp?: string;
+}
+
 const DEFAULT_DASHBOARD_CENTER = { lat: -14.235, lng: -51.9253 };
+
+function getFreshnessState(updatedAt?: string) {
+  if (!updatedAt) {
+    return { labelKey: 'locationUnknown', dotClassName: 'bg-gray-300', textClassName: 'text-gray-400' };
+  }
+
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  if (ageMs <= 60_000) {
+    return { labelKey: 'liveNow', dotClassName: 'bg-green-500', textClassName: 'text-green-600' };
+  }
+
+  if (ageMs <= 5 * 60_000) {
+    return { labelKey: 'updatedRecently', dotClassName: 'bg-amber-400', textClassName: 'text-amber-600' };
+  }
+
+  return { labelKey: 'staleLocation', dotClassName: 'bg-gray-400', textClassName: 'text-gray-500' };
+}
 
 function DriverMapAutoFit({
   points,
@@ -129,17 +167,88 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handler = () => {
-      void queryClient.invalidateQueries({ queryKey: ['live-drivers'] });
+    const handleDriverLocation = (payload: AdminDriverLocationPayload) => {
+      queryClient.setQueryData<LiveDriver[] | undefined>(['live-drivers'], (current) => {
+        if (!current) return current;
+
+        let found = false;
+        const nextDrivers = current.map((driver) => {
+          if (driver._id !== payload.driverId) {
+            return driver;
+          }
+
+          found = true;
+          return {
+            ...driver,
+            currentLocation: {
+              lat: payload.lat,
+              lng: payload.lng,
+              updatedAt: payload.timestamp ?? new Date().toISOString(),
+            },
+          };
+        });
+
+        if (!found) {
+          void queryClient.invalidateQueries({ queryKey: ['live-drivers'] });
+        }
+
+        return nextDrivers;
+      });
     };
 
-    socket.on(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handler);
-    socket.on(SOCKET_EVENTS.ADMIN_ALERT, () => {
+    const handleExecutionUpdate = (payload: AdminExecutionUpdatePayload) => {
+      queryClient.setQueryData<DashboardSummary | undefined>(['dashboard-summary'], (current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          activeExecutions: current.activeExecutions.map((execution) => {
+            if (payload.executionId && execution._id === payload.executionId) {
+              return {
+                ...execution,
+                status: payload.status ?? execution.status,
+              };
+            }
+
+            if (payload.driverId && execution.driverId?._id === payload.driverId) {
+              return {
+                ...execution,
+                driverId: {
+                  ...execution.driverId,
+                  isOnline:
+                    payload.event === 'DRIVER_ONLINE'
+                      ? true
+                      : payload.event === 'DRIVER_OFFLINE'
+                        ? false
+                        : execution.driverId.isOnline,
+                },
+              };
+            }
+
+            return execution;
+          }),
+        };
+      });
+
       void queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-    });
+
+      if (payload.event === 'DRIVER_ONLINE' || payload.event === 'DRIVER_OFFLINE') {
+        void queryClient.invalidateQueries({ queryKey: ['live-drivers'] });
+      }
+    };
+
+    const handleAlert = () => {
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    };
+
+    socket.on(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+    socket.on(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+    socket.on(SOCKET_EVENTS.ADMIN_ALERT, handleAlert);
 
     return () => {
-      socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handler);
+      socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+      socket.off(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+      socket.off(SOCKET_EVENTS.ADMIN_ALERT, handleAlert);
     };
   }, [socket]);
   const summary = data?.cards;
@@ -160,7 +269,6 @@ export default function DashboardPage() {
       })),
     [liveDrivers]
   );
-  const mapCenter = mapPoints[0] ?? DEFAULT_DASHBOARD_CENTER;
 
   if (isLoading) {
     return (
@@ -222,7 +330,6 @@ export default function DashboardPage() {
               <GoogleMapsProvider className="h-full w-full">
                 <Map
                   defaultCenter={DEFAULT_DASHBOARD_CENTER}
-                  center={mapCenter}
                   defaultZoom={11}
                   mapId="logx-dashboard-map"
                   gestureHandling="greedy"
@@ -261,8 +368,11 @@ export default function DashboardPage() {
                 {liveDrivers.length === 0 ? (
                   <div className="px-4 py-6 text-sm text-gray-400">{t('noDriverLocations')}</div>
                 ) : (
-                  liveDrivers.map((driver) => (
-                    <div key={driver._id} className="px-4 py-3">
+                  liveDrivers.map((driver) => {
+                    const freshness = getFreshnessState(driver.currentLocation?.updatedAt);
+
+                    return (
+                      <div key={driver._id} className="px-4 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-gray-900">{driver.name}</p>
@@ -270,13 +380,24 @@ export default function DashboardPage() {
                             {driver.vehicleId?.plate ?? t('vehicleUnknown')}
                           </p>
                         </div>
-                        <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                        <div className={`h-2.5 w-2.5 rounded-full ${freshness.dotClassName}`} />
                       </div>
                       <p className="mt-2 font-mono text-xs text-gray-600">
                         {driver.currentLocation!.lat.toFixed(5)}, {driver.currentLocation!.lng.toFixed(5)}
                       </p>
-                    </div>
-                  ))
+                      <div className={`mt-2 flex items-center justify-between text-[11px] ${freshness.textClassName}`}>
+                        <span>{t(freshness.labelKey)}</span>
+                        <span className="text-gray-400">
+                          {t('lastUpdated', {
+                            value: driver.currentLocation?.updatedAt
+                              ? formatDateTime(driver.currentLocation.updatedAt, locale)
+                              : '-',
+                          })}
+                        </span>
+                      </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

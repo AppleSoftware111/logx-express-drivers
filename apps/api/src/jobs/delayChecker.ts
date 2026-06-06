@@ -12,10 +12,10 @@ import {
   buildDelayAlertMessage,
   sendWhatsApp,
 } from '../modules/notifications/notification.service';
-import { getIO } from '../socket';
 import { invalidateCache } from '../utils/cache';
 import { calcDelayMinutes, getCurrentBusinessDate } from '../utils/timeCalc';
 import { runWithJobLock } from './jobLock';
+import { emitAdminAlert, emitExecutionRealtimeUpdate } from '../socket/realtime';
 
 const DELAY_THRESHOLDS: { minutes: number; type: AlertType }[] = [
   { minutes: 15, type: AlertType.DELAY_15 },
@@ -56,6 +56,7 @@ async function checkDelays(): Promise<void> {
   const touchedCompanies = new Set<string>();
 
   for (const execution of pendingExecutions) {
+    const companyId = execution.companyId.toString();
     const delayMinutes = calcDelayMinutes(
       execution.scheduledDate,
       execution.scheduledTime,
@@ -67,13 +68,23 @@ async function checkDelays(): Promise<void> {
         $set: { delayMinutes },
       });
       touchedCompanies.add(execution.companyId.toString());
+      emitExecutionRealtimeUpdate(companyId, {
+        event: 'DELAY_UPDATED',
+        executionId: execution._id.toString(),
+        routeId:
+          typeof execution.routeId === 'object' && execution.routeId !== null && '_id' in execution.routeId
+            ? String(execution.routeId._id)
+            : String(execution.routeId),
+        driverId: execution.driverId ? String(execution.driverId) : undefined,
+        status: execution.status,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (delayMinutes === 0) continue;
 
     const routeName =
       (execution.routeId as { name?: string })?.name ?? String(execution.routeId);
-    const companyId = execution.companyId.toString();
 
     for (const threshold of DELAY_THRESHOLDS) {
       if (delayMinutes < threshold.minutes) continue;
@@ -91,13 +102,9 @@ async function checkDelays(): Promise<void> {
         { routeName, minutes: delayMinutes }
       );
 
-      // Real-time socket broadcast
-      try {
-        const io = getIO();
-        const alert = await Alert.findById(alertId).lean();
-        io.to(`admin:${companyId}`).emit('admin:alert', alert);
-      } catch {
-        // Socket not available during tests
+      const alert = await Alert.findById(alertId).lean();
+      if (alert) {
+        emitAdminAlert(companyId, alert);
       }
 
       // WhatsApp to driver

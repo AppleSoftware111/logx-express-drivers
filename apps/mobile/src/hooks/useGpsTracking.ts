@@ -1,10 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect } from 'react';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
-import { API_URL } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useSocketStore } from '../stores/socketStore';
 import {
   consumeQueuedGpsPayloads,
   getTrackedExecutionId,
@@ -16,43 +15,42 @@ import {
 
 export function useGpsTracking(executionId: string | null, isActive: boolean) {
   const { accessToken } = useAuthStore();
-  const socketRef = useRef<Socket | null>(null);
+  const socket = useSocketStore((state) => state.socket);
 
   useEffect(() => {
     if (!isActive || !executionId || !accessToken) {
       void stopBackgroundGps();
-      socketRef.current?.disconnect();
       setGpsCallback(null);
       return;
     }
 
-    // Connect socket
-    socketRef.current = io(API_URL, {
-      auth: { token: accessToken },
-      transports: ['websocket'],
-    });
-
-    socketRef.current.on('connect', () => {
-      console.info('[gps] Socket connected');
+    const flushQueuedPayloads = () => {
       void consumeQueuedGpsPayloads().then((payloads) => {
         payloads.forEach((payload) => {
-          socketRef.current?.emit(SOCKET_EVENTS.DRIVER_LOCATION, payload);
+          useSocketStore.getState().socket?.emit(SOCKET_EVENTS.DRIVER_LOCATION, payload);
         });
       });
-    });
+    };
 
-    socketRef.current.on(SOCKET_EVENTS.DRIVER_ARRIVED_CONFIRMED, (data: { clientName: string; stopId: string }) => {
+    if (socket?.connected) {
+      flushQueuedPayloads();
+    }
+
+    const handleArrivalConfirmed = (data: { clientName: string; stopId: string }) => {
       // Notify the driver (handled in screen)
       console.info(`[gps] Arrived at ${data.clientName}`);
-    });
+    };
+
+    socket?.on('connect', flushQueuedPayloads);
+    socket?.on(SOCKET_EVENTS.DRIVER_ARRIVED_CONFIRMED, handleArrivalConfirmed);
 
     // Set GPS callback to emit via socket
     setGpsCallback(async (payload: GpsPayload) => {
-      const socket = socketRef.current;
-      if (!socket?.connected) {
+      const activeSocket = useSocketStore.getState().socket;
+      if (!activeSocket?.connected) {
         return false;
       }
-      socket.emit(SOCKET_EVENTS.DRIVER_LOCATION, payload);
+      activeSocket.emit(SOCKET_EVENTS.DRIVER_LOCATION, payload);
       return true;
     });
 
@@ -65,10 +63,11 @@ export function useGpsTracking(executionId: string | null, isActive: boolean) {
     })();
 
     return () => {
-      socketRef.current?.disconnect();
+      socket?.off('connect', flushQueuedPayloads);
+      socket?.off(SOCKET_EVENTS.DRIVER_ARRIVED_CONFIRMED, handleArrivalConfirmed);
       setGpsCallback(null);
     };
-  }, [isActive, executionId, accessToken]);
+  }, [isActive, executionId, accessToken, socket]);
 
-  return { socket: socketRef.current };
+  return { socket };
 }

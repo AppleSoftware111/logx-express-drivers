@@ -2,9 +2,9 @@ import cron from 'node-cron';
 
 import { env } from '../config/env';
 import { Route } from '../models/Route.model';
-import { RouteExecution } from '../models/RouteExecution.model';
 import { Driver } from '../models/Driver.model';
 import { User } from '../models/User.model';
+import { generateExecutionForDate, touchDashboard } from '../modules/executions/execution.service';
 import {
   buildRouteAssignedMessage,
   sendWhatsApp,
@@ -67,46 +67,21 @@ export async function generateRoutesForDate(
         continue;
       }
 
-      const executionData = {
-        companyId: route.companyId,
-        routeId: route._id,
-        contractId: route.contractId,
-        scheduledDate: normalizedDate,
-        scheduledTime: route.scheduledTime,
-        driverId: route.defaultDriverId,
-        originalDriverId: route.defaultDriverId,
-        isSubstitution: false,
-        status: 'PENDING',
-        delayMinutes: 0,
-        stops: route.stops.map((s, i) => ({
-          routeStopIndex: i,
-          clientId: s.clientId,
-          order: s.order,
-          address: s.address,
-          location: s.location,
-          plannedTime: s.plannedTime,
-          expectedDurationMinutes: s.expectedDurationMinutes ?? 15,
-          type: s.type,
-          instructions: s.instructions,
-          status: 'PENDING',
-        })),
-      };
+      const execution = await generateExecutionForDate(String(route._id), normalizedDate);
 
-      // Atomic upsert — safe if cron fires twice
-      const result = await RouteExecution.findOneAndUpdate(
-        { routeId: route._id, scheduledDate: normalizedDate },
-        { $setOnInsert: executionData },
-        { upsert: true, new: false, setDefaultsOnInsert: true }
-      );
-
-      if (!result) {
-        // null means document was inserted (new creation)
+      if (execution) {
         generated++;
+        touchDashboard(String(route.companyId));
+
+        const normalizedDriverId =
+          typeof route.defaultDriverId === 'object' && route.defaultDriverId !== null
+            ? String(route.defaultDriverId._id)
+            : String(route.defaultDriverId);
 
         // Send WhatsApp notification to driver
-        const driver = await Driver.findById(route.defaultDriverId).select('name phone').lean();
+        const driver = await Driver.findById(normalizedDriverId).select('name phone').lean();
         if (driver?.phone) {
-          const driverUser = await User.findOne({ driverId: route.defaultDriverId })
+          const driverUser = await User.findOne({ driverId: normalizedDriverId })
             .select('locale')
             .lean();
           await sendWhatsApp(

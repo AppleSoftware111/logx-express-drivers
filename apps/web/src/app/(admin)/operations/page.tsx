@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Map, AdvancedMarker, Pin, Polyline } from '@vis.gl/react-google-maps';
 import { useLocale, useTranslations } from 'next-intl';
 
@@ -17,7 +17,7 @@ import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
-import { getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
+import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
 interface Execution {
   _id: string;
@@ -53,16 +53,27 @@ interface DriverLocation {
   lat: number;
   lng: number;
   executionId: string;
+  timestamp?: string;
+}
+
+interface AdminExecutionUpdatePayload {
+  event: string;
+  executionId?: string;
+  driverId?: string;
+  status?: string;
+  timestamp?: string;
 }
 
 export default function OperationsPage() {
   const locale = useLocale() as SupportedLocale;
   const tExecutions = useTranslations('executions');
   const tRoutes = useTranslations('routes');
+  const tDashboard = useTranslations('dashboard');
   const [selected, setSelected] = useState<string | null>(null);
   const [liveLocations, setLiveLocations] = useState<Record<string, DriverLocation>>({});
   const { socket } = useSocket();
   const hasToken = useHasAccessToken();
+  const queryClient = useQueryClient();
 
   const { data: executions, isLoading } = useQuery({
     queryKey: ['today-executions'],
@@ -79,20 +90,59 @@ export default function OperationsPage() {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on(
-      SOCKET_EVENTS.ADMIN_DRIVER_LOCATION,
-      (data: DriverLocation) => {
-        setLiveLocations((prev) => ({
-          ...prev,
-          [data.driverId]: data,
-        }));
+    const handleDriverLocation = (data: DriverLocation) => {
+      setLiveLocations((prev) => ({
+        ...prev,
+        [data.driverId]: data,
+      }));
+    };
+
+    const handleExecutionUpdate = (payload: AdminExecutionUpdatePayload) => {
+      void queryClient.invalidateQueries({ queryKey: ['today-executions'] });
+
+      if (
+        payload.event === 'DRIVER_ONLINE' ||
+        payload.event === 'DRIVER_OFFLINE' ||
+        payload.event === 'DRIVER_SUBSTITUTED'
+      ) {
+        void queryClient.invalidateQueries({ queryKey: ['today-executions'] });
       }
-    );
+    };
+
+    socket.on(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+    socket.on(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
 
     return () => {
-      socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION);
+      socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+      socket.off(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
     };
-  }, [socket]);
+  }, [queryClient, socket]);
+
+  useEffect(() => {
+    if (!executions?.length) return;
+
+    setLiveLocations((prev) => {
+      const next = { ...prev };
+
+      executions.forEach((execution) => {
+        if (
+          execution.driverId?._id &&
+          typeof execution.driverId.currentLocation?.lat === 'number' &&
+          typeof execution.driverId.currentLocation?.lng === 'number'
+        ) {
+          next[execution.driverId._id] = {
+            driverId: execution.driverId._id,
+            executionId: execution._id,
+            lat: execution.driverId.currentLocation.lat,
+            lng: execution.driverId.currentLocation.lng,
+            timestamp: execution.driverId.currentLocation.updatedAt,
+          };
+        }
+      });
+
+      return next;
+    });
+  }, [executions]);
 
   useEffect(() => {
     if (!selected && executions?.length) {
@@ -101,6 +151,10 @@ export default function OperationsPage() {
   }, [executions, selected]);
 
   const selectedExecution = executions?.find((e) => e._id === selected);
+  const selectedDriverLocation = selectedExecution?.driverId?._id
+    ? liveLocations[selectedExecution.driverId._id]
+    : undefined;
+  const allLiveLocations = useMemo(() => Object.values(liveLocations), [liveLocations]);
   const routePath =
     selectedExecution?.stops.map((stop) => ({
       lat: stop.location.lat,
@@ -176,6 +230,13 @@ export default function OperationsPage() {
                     ? ` · ${selectedExecution.driverId.phone}`
                     : ''}
                 </p>
+                {selectedDriverLocation?.timestamp ? (
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    {tDashboard('lastUpdated', {
+                      value: formatDateTime(selectedDriverLocation.timestamp, locale),
+                    })}
+                  </p>
+                ) : null}
               </div>
               <Link
                 href={`/executions/${selectedExecution._id}`}
@@ -246,7 +307,7 @@ export default function OperationsPage() {
             className="w-full h-full"
           >
             {/* All live drivers */}
-            {Object.values(liveLocations).map((loc) => (
+            {allLiveLocations.map((loc) => (
               <AdvancedMarker
                 key={loc.driverId}
                 position={{ lat: loc.lat, lng: loc.lng }}

@@ -25,6 +25,7 @@ export const SOCKET_ROOMS = {
   companyRoom: (companyId: string) => `company:${companyId}`,
   driverRoom: (driverId: string) => `driver:${driverId}`,
   clientRoom: (clientId: string) => `client:${clientId}`,
+  executionRoom: (executionId: string) => `execution:${executionId}`,
 } as const;
 
 export const SOCKET_EVENTS = {
@@ -38,6 +39,8 @@ export const SOCKET_EVENTS = {
   ADMIN_EXECUTION_UPDATE: 'admin:execution_update',
   // Server → Driver
   DRIVER_ROUTE_ASSIGNED: 'driver:route_assigned',
+  DRIVER_ROUTE_UPDATED: 'driver:route_updated',
+  DRIVER_ROUTE_CANCELLED: 'driver:route_cancelled',
   DRIVER_ARRIVED_CONFIRMED: 'driver:arrived_confirmed',
   // Server → Client
   CLIENT_DELIVERY_UPDATE: 'client:delivery_update',

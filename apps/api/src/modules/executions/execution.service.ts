@@ -11,8 +11,10 @@ import { Alert } from '../../models/Alert.model';
 import { GpsPoint } from '../../models/GpsPoint.model';
 import { Route } from '../../models/Route.model';
 import { RouteExecution, type IRouteExecution } from '../../models/RouteExecution.model';
+import { SOCKET_EVENTS } from '@logx/shared';
 import { localizeAlertDocument } from '../alerts/alert.service';
 import { invalidateCache } from '../../utils/cache';
+import { emitExecutionRealtimeUpdate } from '../../socket/realtime';
 import {
   businessDateStringToUtcDate,
   calcDelayMinutes,
@@ -221,6 +223,32 @@ export async function updateExecutionStatus(
   ).lean();
 
   touchDashboard(companyId);
+  if (updated) {
+    emitExecutionRealtimeUpdate(
+      companyId,
+      {
+        event:
+          data.status === 'CANCELLED'
+            ? 'EXECUTION_CANCELLED'
+            : data.status === 'COMPLETED'
+              ? 'STATUS_CHANGED'
+              : 'STATUS_CHANGED',
+        executionId: String(updated._id),
+        routeId: String(updated.routeId),
+        driverId: String(updated.driverId),
+        status: updated.status,
+        scheduledTime: updated.scheduledTime,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        driverEvent:
+          data.status === 'CANCELLED'
+            ? SOCKET_EVENTS.DRIVER_ROUTE_CANCELLED
+            : SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+        driverIds: [String(updated.driverId)],
+      }
+    );
+  }
 
   return updated;
 }
@@ -237,6 +265,8 @@ export async function substituteDriver(
     throw new AppError(ApiErrorCode.EXECUTION_CANNOT_SUBSTITUTE, 400);
   }
 
+  const previousDriverId = execution.driverId ? String(execution.driverId) : undefined;
+
   const updated = await RouteExecution.findByIdAndUpdate(
     executionId,
     {
@@ -251,6 +281,51 @@ export async function substituteDriver(
     .lean();
 
   touchDashboard(companyId);
+  if (updated) {
+    emitExecutionRealtimeUpdate(
+      companyId,
+      {
+        event: 'DRIVER_SUBSTITUTED',
+        executionId: String(updated._id),
+        routeId:
+          typeof updated.routeId === 'object' && updated.routeId !== null && '_id' in updated.routeId
+            ? String(updated.routeId._id)
+            : String(updated.routeId),
+        driverId: data.newDriverId,
+        previousDriverId,
+        status: updated.status,
+        scheduledTime: updated.scheduledTime,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_ASSIGNED,
+        driverIds: [data.newDriverId],
+      }
+    );
+
+    if (previousDriverId && previousDriverId !== data.newDriverId) {
+      emitExecutionRealtimeUpdate(
+        companyId,
+        {
+          event: 'EXECUTION_CANCELLED',
+          executionId: String(updated._id),
+          routeId:
+            typeof updated.routeId === 'object' && updated.routeId !== null && '_id' in updated.routeId
+              ? String(updated.routeId._id)
+              : String(updated.routeId),
+          driverId: previousDriverId,
+          previousDriverId,
+          status: updated.status,
+          scheduledTime: updated.scheduledTime,
+          timestamp: new Date().toISOString(),
+        },
+        {
+          driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_CANCELLED,
+          driverIds: [previousDriverId],
+        }
+      );
+    }
+  }
   return updated;
 }
 
@@ -281,6 +356,23 @@ export async function setStopArrived(
 
   await execution.save();
   touchDashboard(companyId);
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event: 'STOP_ARRIVED',
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId: stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
   return execution.toObject();
 }
 
@@ -307,6 +399,23 @@ export async function setStopInProgress(
 
   await execution.save();
   touchDashboard(companyId);
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event: 'STOP_STARTED',
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
   return execution.toObject();
 }
 
@@ -345,6 +454,23 @@ export async function completeStop(
   syncExecutionLifecycle(execution);
   await execution.save();
   touchDashboard(companyId);
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event: 'STOP_COMPLETED',
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
   return execution.toObject();
 }
 
@@ -368,6 +494,23 @@ export async function skipStop(
   syncExecutionLifecycle(execution);
   await execution.save();
   touchDashboard(companyId);
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event: 'STOP_SKIPPED',
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
   return execution.toObject();
 }
 
@@ -391,6 +534,23 @@ export async function savePodToStop(
 
   await execution.save();
   touchDashboard(companyId);
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event: 'POD_SAVED',
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
   return stop;
 }
 
@@ -448,6 +608,29 @@ export async function generateExecutionForDate(routeId: string, targetDate: Date
     { routeId: route._id, scheduledDate },
     { $setOnInsert: executionData },
     { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const normalizedDriverId =
+    typeof route.defaultDriverId === 'object' && route.defaultDriverId !== null
+      ? String(route.defaultDriverId._id)
+      : String(route.defaultDriverId);
+
+  emitExecutionRealtimeUpdate(
+    String(route.companyId),
+    {
+      event: 'EXECUTION_ASSIGNED',
+      executionId: String(execution._id),
+      routeId: String(route._id),
+      routeName: route.name,
+      driverId: normalizedDriverId,
+      status: execution.status,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_ASSIGNED,
+      driverIds: [normalizedDriverId],
+    }
   );
 
   return execution;

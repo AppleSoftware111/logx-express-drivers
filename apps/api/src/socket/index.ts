@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import { verifyAccessToken } from '../utils/jwtHelpers';
 import { registerDashboardHandlers } from './dashboardHandler';
 import { registerGpsHandlers } from './gpsHandler';
+import { SOCKET_ROOMS } from '@logx/shared';
 
 let io: SocketIOServer | null = null;
 
@@ -56,19 +57,19 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
     };
 
     // Join company room (all users)
-    void socket.join(`company:${companyId}`);
+    void socket.join(SOCKET_ROOMS.companyRoom(companyId));
 
     // Join role-specific rooms
     if (['ADMIN', 'OPERATOR', 'SUPER_ADMIN'].includes(role)) {
-      void socket.join(`admin:${companyId}`);
+      void socket.join(SOCKET_ROOMS.adminRoom(companyId));
     }
 
     if (role === 'DRIVER' && driverId) {
-      void socket.join(`driver:${driverId}`);
+      void socket.join(SOCKET_ROOMS.driverRoom(driverId));
     }
 
     if (role === 'CLIENT' && clientId) {
-      void socket.join(`client:${clientId}`);
+      void socket.join(SOCKET_ROOMS.clientRoom(clientId));
     }
 
     registerGpsHandlers(io!, socket);

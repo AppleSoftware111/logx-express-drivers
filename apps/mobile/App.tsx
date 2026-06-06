@@ -22,6 +22,7 @@ import {
   registerAuthFailureHandler,
 } from './src/services/api';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
+import { useDriverRealtime } from './src/hooks/useDriverRealtime';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,6 +66,8 @@ function AppContent() {
   const [bootstrapNonce, setBootstrapNonce] = useState(0);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const { isOnline } = useNetworkStatus();
+
+  useDriverRealtime();
 
   useEffect(() => {
     const bootstrap = async () => {
