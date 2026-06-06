@@ -298,8 +298,24 @@ jobs:
           set -euo pipefail
 
           if [ "${{ needs.changes.outputs.api }}" = "true" ]; then
+            API_TARGET_GROUP_ARN="$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_SERVICE_API" \
+              --query 'services[0].loadBalancers[0].targetGroupArn' \
+              --output text)"
+
+            API_LOAD_BALANCER_ARN="$(aws elbv2 describe-target-groups \
+              --target-group-arns "$API_TARGET_GROUP_ARN" \
+              --query 'TargetGroups[0].LoadBalancerArns[0]' \
+              --output text)"
+
+            API_LOAD_BALANCER_DNS="$(aws elbv2 describe-load-balancers \
+              --load-balancer-arns "$API_LOAD_BALANCER_ARN" \
+              --query 'LoadBalancers[0].DNSName' \
+              --output text)"
+
             curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
-              "${NEXT_PUBLIC_API_URL%/}/health"
+              "http://${API_LOAD_BALANCER_DNS}/health"
           fi
 
           if [ "${{ needs.changes.outputs.web }}" = "true" ]; then
