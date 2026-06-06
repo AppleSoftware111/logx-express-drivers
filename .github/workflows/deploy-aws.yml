@@ -323,7 +323,7 @@ jobs:
               "http://${WEB_LOAD_BALANCER_DNS}/api/health"
 
             curl --fail --retry 5 --retry-delay 10 --retry-connrefused \
-              "${FRONTEND_URL%/}/login"
+              "http://${WEB_LOAD_BALANCER_DNS}/login"
           fi
 
   invalidate-cloudfront:

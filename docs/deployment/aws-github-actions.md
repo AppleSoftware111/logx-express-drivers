@@ -102,7 +102,7 @@ Ensure API and Web ECS services have:
 
 ### Stage 2: Staging verification checklist
 - API health endpoint responds: `/health`.
-- Web login succeeds and API calls work.
+- Web login succeeds through the ECS web load balancer and API calls work.
 - S3 upload flow works from app.
 - Locale switching (`pt`, `es`, `en`) works in web.
 - CloudFront serves updated web content.
