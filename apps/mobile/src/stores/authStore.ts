@@ -6,20 +6,26 @@ interface AuthUser {
   role: string;
   companyId?: string;
   driverId?: string;
+  locale?: string;
 }
 
 interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: AuthUser, token: string) => void;
+  setAuth: (user: AuthUser, accessToken: string, refreshToken?: string | null) => void;
+  updateAccessToken: (accessToken: string) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
+  refreshToken: null,
   isAuthenticated: false,
-  setAuth: (user, accessToken) => set({ user, accessToken, isAuthenticated: true }),
-  logout: () => set({ user: null, accessToken: null, isAuthenticated: false }),
+  setAuth: (user, accessToken, refreshToken = null) =>
+    set({ user, accessToken, refreshToken, isAuthenticated: true }),
+  updateAccessToken: (accessToken) => set((state) => ({ ...state, accessToken })),
+  logout: () => set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
 }));

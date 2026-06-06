@@ -10,12 +10,11 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 import { useTranslation } from 'react-i18next';
 
 import { resolveApiErrorMessage, SUPPORTED_LOCALES, type SupportedLocale } from '@logx/i18n';
 
-import { apiClient } from '../services/api';
+import { apiClient, persistAuthSession } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLocaleStore } from '../stores/localeStore';
 
@@ -46,10 +45,10 @@ export function LoginScreen({ onLogin }: Props) {
     setLoading(true);
     try {
       const res = await apiClient.post('/auth/login', { email, password });
-      const { accessToken, user } = res.data.data;
+      const { accessToken, refreshToken, user } = res.data.data;
 
-      await SecureStore.setItemAsync('accessToken', accessToken);
-      setAuth(user, accessToken);
+      await persistAuthSession(accessToken, refreshToken);
+      setAuth(user, accessToken, refreshToken);
       onLogin();
     } catch (err) {
       const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } };

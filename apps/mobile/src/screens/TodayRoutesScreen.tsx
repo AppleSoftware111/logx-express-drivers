@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatDateByLocale, getExecutionStatusLabel } from '@logx/i18n';
 
@@ -27,6 +28,7 @@ interface Execution {
 
 interface Props {
   onSelectExecution: (executionId: string) => void;
+  onOpenSettings: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,10 +40,11 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: '#dc2626',
 };
 
-export function TodayRoutesScreen({ onSelectExecution }: Props) {
+export function TodayRoutesScreen({ onSelectExecution, onOpenSettings }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const insets = useSafeAreaInsets();
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['today-routes'],
     queryFn: async () => {
       const res = await apiClient.get<{ success: boolean; data: Execution[] }>(
@@ -100,18 +103,32 @@ export function TodayRoutesScreen({ onSelectExecution }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('mobile.todayRoutes')}</Text>
-        <Text style={styles.subtitle}>
-          {formatDateByLocale(new Date(), locale, {
-            weekday: 'short',
-            day: '2-digit',
-            month: 'short',
-          })}
-        </Text>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>{t('mobile.todayRoutes')}</Text>
+            <Text style={styles.subtitle}>
+              {formatDateByLocale(new Date(), locale, {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+              })}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.settingsButton} onPress={onOpenSettings}>
+            <Text style={styles.settingsButtonText}>{t('settings.title')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {data?.length === 0 ? (
+      {isError ? (
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>{t('common.errorMessage')}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => void refetch()}>
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : data?.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyText}>{t('mobile.noRoutesToday')}</Text>
         </View>
@@ -137,9 +154,13 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#1e3a8a',
-    paddingTop: 56,
     paddingBottom: 20,
     paddingHorizontal: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   title: {
     fontSize: 24,
@@ -150,6 +171,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#93c5fd',
     marginTop: 4,
+  },
+  settingsButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  settingsButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   list: {
     padding: 16,
@@ -226,5 +260,19 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#9ca3af',
     fontSize: 16,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  retryButton: {
+    marginTop: 12,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

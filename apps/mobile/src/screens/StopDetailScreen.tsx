@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { formatTimeByLocale, getRouteStopTypeLabel } from '@logx/i18n';
+import { formatTimeByLocale, getRouteStopTypeLabel, resolveApiErrorMessage } from '@logx/i18n';
 
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface Stop {
   _id: string;
@@ -29,6 +31,7 @@ interface Stop {
   startedAt?: string;
   completedAt?: string;
   waitingTimeMinutes?: number;
+  instructions?: string;
 }
 
 interface Props {
@@ -40,6 +43,8 @@ interface Props {
 export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
+  const { isOnline } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const arrived = useMutation({
@@ -49,7 +54,13 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
     },
-    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.arrivalFailed')),
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } };
+      const message = axiosErr.response?.data
+        ? resolveApiErrorMessage(axiosErr.response.data, locale)
+        : t('mobile.arrivalFailed');
+      Alert.alert(t('common.errorTitle'), message);
+    },
   });
 
   const startPickup = useMutation({
@@ -59,6 +70,19 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
     },
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.startStopFailed')),
+  });
+
+  const skipStop = useMutation({
+    mutationFn: async () => {
+      await apiClient.post(`/executions/${executionId}/stops/${stop._id}/skip`, {
+        reason: t('mobile.skipReasonDefault'),
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+    },
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.skipStopFailed')),
   });
 
   const openMaps = () => {
@@ -73,7 +97,7 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.stopNumber}>{t('mobile.stopDetail')} {stop.order + 1}</Text>
         <Text style={styles.clientName}>{stop.clientId?.name}</Text>
         <Text style={styles.address}>{stop.address}</Text>
@@ -96,6 +120,12 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
             <Text style={styles.waitingText}>⏱ {t('executions.waitingTime')}: {stop.waitingTimeMinutes} min</Text>
           </View>
         )}
+        {!!stop.instructions && (
+          <View style={styles.instructionsBox}>
+            <Text style={styles.instructionsTitle}>{t('common.notes')}</Text>
+            <Text style={styles.instructionsText}>{stop.instructions}</Text>
+          </View>
+        )}
       </View>
 
       {/* Actions */}
@@ -109,8 +139,14 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
         {stop.status === 'PENDING' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.arrivedButton]}
-            onPress={() => arrived.mutate()}
-            disabled={arrived.isPending}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
+                return;
+              }
+              arrived.mutate();
+            }}
+            disabled={arrived.isPending || !isOnline}
           >
             {arrived.isPending ? (
               <ActivityIndicator color="#fff" />
@@ -123,8 +159,14 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
         {stop.status === 'ARRIVED' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.startButton]}
-            onPress={() => startPickup.mutate()}
-            disabled={startPickup.isPending}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
+                return;
+              }
+              startPickup.mutate();
+            }}
+            disabled={startPickup.isPending || !isOnline}
           >
             {startPickup.isPending ? (
               <ActivityIndicator color="#fff" />
@@ -139,11 +181,39 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
         {stop.status === 'IN_PROGRESS' && (
           <TouchableOpacity
             style={[styles.actionButton, styles.completeButton]}
-            onPress={onOpenPOD}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
+                return;
+              }
+              onOpenPOD();
+            }}
           >
             <Text style={[styles.actionButtonText, { color: '#fff' }]}>
               ✅ {t('mobile.completeCapturePod')}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {['PENDING', 'ARRIVED'].includes(stop.status) && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.skipButton]}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
+                return;
+              }
+              skipStop.mutate();
+            }}
+            disabled={skipStop.isPending || !isOnline}
+          >
+            {skipStop.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>
+                ↷ {t('mobile.skipStop')}
+              </Text>
+            )}
           </TouchableOpacity>
         )}
       </View>
@@ -178,7 +248,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#1e3a8a',
     padding: 20,
-    paddingTop: 40,
   },
   stopNumber: {
     fontSize: 12,
@@ -242,6 +311,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  instructionsBox: {
+    marginTop: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    padding: 12,
+  },
+  instructionsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  instructionsText: {
+    fontSize: 13,
+    color: '#374151',
+  },
   actionButton: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -261,6 +346,10 @@ const styles = StyleSheet.create({
   completeButton: {
     backgroundColor: '#16a34a',
     borderColor: '#16a34a',
+  },
+  skipButton: {
+    backgroundColor: '#6b7280',
+    borderColor: '#6b7280',
   },
   actionButtonText: {
     fontSize: 15,

@@ -170,10 +170,33 @@ export async function getExecution(companyId: string, executionId: string) {
 export async function updateExecutionStatus(
   companyId: string,
   executionId: string,
-  data: UpdateExecutionStatusInput
+  data: UpdateExecutionStatusInput,
+  actor?: ExecutionActor
 ) {
   const execution = await RouteExecution.findOne({ companyId, _id: executionId });
   if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+
+  if (actor?.role === 'DRIVER') {
+    ensureExecutionActorAccess(execution, actor);
+
+    const allowedDriverStatuses: UpdateExecutionStatusInput['status'][] = ['IN_PROGRESS', 'COMPLETED'];
+    if (!allowedDriverStatuses.includes(data.status)) {
+      throw new AppError(ApiErrorCode.FORBIDDEN, 403);
+    }
+
+    if (data.status === 'COMPLETED') {
+      const allStopsResolved =
+        execution.stops.length > 0 &&
+        execution.stops.every((stop) => ['COMPLETED', 'SKIPPED'].includes(stop.status));
+
+      if (!allStopsResolved) {
+        throw new AppError(ApiErrorCode.VALIDATION_ERROR, 400, {
+          status: data.status,
+          reason: 'all_stops_must_be_resolved',
+        });
+      }
+    }
+  }
 
   const update: Record<string, unknown> = { status: data.status };
 

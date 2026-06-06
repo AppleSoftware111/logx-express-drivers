@@ -2,6 +2,9 @@ import axios, { create } from 'axios';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
+import type { ApiResponse } from '@logx/shared';
+
+import { useAuthStore } from '../stores/authStore';
 import { useLocaleStore } from '../stores/localeStore';
 
 /**
@@ -11,6 +14,11 @@ import { useLocaleStore } from '../stores/localeStore';
  * Set EXPO_PUBLIC_API_URL or expo.extra.apiUrl for all non-dev builds.
  */
 const DEV_FALLBACK_API_URL = 'http://10.0.2.2:4000';
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+
+type AuthFailureHandler = () => void | Promise<void>;
+let authFailureHandler: AuthFailureHandler | null = null;
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -30,6 +38,37 @@ function resolveApiUrl(): string {
 
 export const API_URL = resolveApiUrl();
 
+export async function persistAuthSession(accessToken: string, refreshToken?: string | null): Promise<void> {
+  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+
+  if (refreshToken) {
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+  }
+}
+
+export async function clearAuthSession(): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+  ]);
+}
+
+export async function getStoredAuthSession(): Promise<{
+  accessToken: string | null;
+  refreshToken: string | null;
+}> {
+  const [accessToken, refreshToken] = await Promise.all([
+    SecureStore.getItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.getItemAsync(REFRESH_TOKEN_KEY),
+  ]);
+
+  return { accessToken, refreshToken };
+}
+
+export function registerAuthFailureHandler(handler: AuthFailureHandler | null): void {
+  authFailureHandler = handler;
+}
+
 export const apiClient = create({
   baseURL: `${API_URL}/api`,
   timeout: 15_000,
@@ -37,7 +76,7 @@ export const apiClient = create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('accessToken');
+  const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
   if (config.headers) {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -56,17 +95,38 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const res = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
-          withCredentials: true,
-        });
-        const newToken = res.data.data?.accessToken;
+        const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+        if (!refreshToken) {
+          throw new Error('Missing refresh token');
+        }
+
+        const res = await axios.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
+          `${API_URL}/api/auth/refresh`,
+          { refreshToken },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept-Language': useLocaleStore.getState().locale,
+            },
+          }
+        );
+
+        const body = res.data;
+        const newToken = body.success ? body.data.accessToken : undefined;
+        const rotatedRefreshToken = body.success ? body.data.refreshToken : undefined;
         if (newToken) {
-          await SecureStore.setItemAsync('accessToken', newToken);
+          await persistAuthSession(newToken, rotatedRefreshToken ?? refreshToken);
+          useAuthStore.getState().updateAccessToken(newToken);
+          if (!originalRequest.headers) {
+            originalRequest.headers = {};
+          }
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }
       } catch {
-        await SecureStore.deleteItemAsync('accessToken');
+        await clearAuthSession();
+        useAuthStore.getState().logout();
+        await authFailureHandler?.();
       }
     }
 

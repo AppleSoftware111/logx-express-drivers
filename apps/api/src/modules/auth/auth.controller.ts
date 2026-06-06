@@ -35,6 +35,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   return sendSuccess(res, {
     accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
     user: result.user,
   });
 });
@@ -55,7 +56,8 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const token: string | undefined = req.cookies?.[REFRESH_COOKIE_NAME];
+  const token: string | undefined =
+    req.cookies?.[REFRESH_COOKIE_NAME] ?? req.body?.refreshToken;
   const userId = req.user!.userId;
 
   await logoutService(userId, token);

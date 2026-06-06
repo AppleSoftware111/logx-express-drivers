@@ -1,6 +1,6 @@
-# LOGX Express — Android APK build guide
+# LOGX BioPoli — Android APK build guide
 
-Driver app package: `com.logxexpress.driver`
+Driver app package: `com.logxbiopoli.driver`
 
 ## Prerequisites
 
@@ -79,21 +79,20 @@ Output APK path is printed at the end (under `apps/mobile` or temp build dir).
 
 ---
 
-## Option C — Gradle after prebuild
+## Option C — Standalone local APK (recommended for LDPlayer)
 
 ```bash
 cd apps/mobile
 copy .env.example .env
 # Edit .env with your EXPO_PUBLIC_API_URL
 
-npx expo prebuild --platform android --clean
-cd android
-.\gradlew.bat assembleRelease
+npm run generate:assets
+npm run build:apk:standalone:ldplayer
 ```
 
 APK: `android/app/build/outputs/apk/release/app-release.apk`
 
-Sign with a keystore for distribution outside debug builds.
+This path builds a standalone release APK and does not require Metro.
 
 ---
 
@@ -127,4 +126,4 @@ Scan QR with **Expo Go**, or press `a` for emulator.
 ## Version bumps
 
 - App version: `app.json` → `expo.version`
-- Android `versionCode`: `app.config.js` → `android.versionCode`
+- Android `versionCode`: pass `ANDROID_VERSION_CODE` to the build or update your release env

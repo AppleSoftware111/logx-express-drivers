@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,16 @@ import {
   Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiClient } from '../services/api';
+import { getCurrentLocation } from '../services/gpsService';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+
+const getPodDraftKey = (executionId: string, stopId: string) => `podDraft:${executionId}:${stopId}`;
 
 interface Props {
   executionId: string;
@@ -25,6 +31,8 @@ interface Props {
 
 export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: Props) {
   const { t } = useTranslation();
+  const { isOnline } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const [mode, setMode] = useState<'idle' | 'camera'>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -32,6 +40,33 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const raw = await AsyncStorage.getItem(getPodDraftKey(executionId, stopId));
+      if (!raw) return;
+
+      try {
+        const draft = JSON.parse(raw) as {
+          photoUri?: string | null;
+          receiverName?: string;
+          notes?: string;
+        };
+        setPhotoUri(draft.photoUri ?? null);
+        setReceiverName(draft.receiverName ?? '');
+        setNotes(draft.notes ?? '');
+      } catch {
+        // Ignore invalid persisted drafts.
+      }
+    })();
+  }, [executionId, stopId]);
+
+  useEffect(() => {
+    void AsyncStorage.setItem(
+      getPodDraftKey(executionId, stopId),
+      JSON.stringify({ photoUri, receiverName, notes })
+    );
+  }, [executionId, stopId, photoUri, receiverName, notes]);
 
   const takePhoto = async () => {
     if (!permission?.granted) {
@@ -54,6 +89,16 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
   };
 
   const handleSubmit = async () => {
+    if (!isOnline) {
+      Alert.alert(t('common.errorTitle'), t('mobile.offlinePodSubmit'));
+      return;
+    }
+
+    if (!photoUri && !receiverName.trim()) {
+      Alert.alert(t('common.errorTitle'), t('mobile.podValidation'));
+      return;
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -72,15 +117,22 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
       if (receiverName) formData.append('receiverName', receiverName);
       if (notes) formData.append('deliveryNotes', notes);
 
-      await apiClient.post(`/pod/${executionId}/stops/${stopId}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      if (photoUri) {
+        await apiClient.post(`/pod/${executionId}/stops/${stopId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
 
       // Complete the stop
+      const currentLocation = await getCurrentLocation();
       await apiClient.post(`/executions/${executionId}/stops/${stopId}/complete`, {
         receiverName,
         deliveryNotes: notes,
+        deliveryLat: currentLocation?.coords.latitude,
+        deliveryLng: currentLocation?.coords.longitude,
       });
+
+      await AsyncStorage.removeItem(getPodDraftKey(executionId, stopId));
 
       Alert.alert(t('common.successSaved'), t('mobile.podSuccess'), [
         { text: 'OK', onPress: onSuccess },
@@ -109,10 +161,16 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title}>{t('mobile.proofOfDelivery')}</Text>
         <Text style={styles.subtitle}>{t('mobile.captureReceiverInfo')}</Text>
       </View>
+
+      {!isOnline && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningBannerText}>{t('mobile.offlinePodSubmit')}</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('common.photo')}</Text>
@@ -186,7 +244,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#16a34a',
     padding: 20,
-    paddingTop: 50,
   },
   title: {
     fontSize: 22,
@@ -197,6 +254,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#bbf7d0',
     marginTop: 4,
+  },
+  warningBanner: {
+    margin: 12,
+    marginBottom: 0,
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  warningBannerText: {
+    color: '#92400e',
+    fontSize: 13,
+    fontWeight: '600',
   },
   section: {
     backgroundColor: '#fff',

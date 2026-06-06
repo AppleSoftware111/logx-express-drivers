@@ -44,7 +44,6 @@ router.post(
 
 router.patch(
   '/:id/status',
-  requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),
   validateBody(updateExecutionStatusSchema),
   patchExecutionStatus
 );

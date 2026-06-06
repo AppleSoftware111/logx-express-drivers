@@ -57,7 +57,8 @@ export const patchExecutionStatus = asyncHandler(async (req: Request, res: Respo
   const execution = await updateExecutionStatus(
     req.user!.companyId,
     req.params.id,
-    req.body
+    req.body,
+    req.user
   );
   return sendSuccess(res, execution);
 });

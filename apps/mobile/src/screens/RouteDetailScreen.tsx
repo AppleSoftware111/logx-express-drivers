@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,19 @@ import {
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getStopStatusLabel, getRouteStopTypeLabel } from '@logx/i18n';
+import {
+  getStopStatusLabel,
+  getRouteStopTypeLabel,
+  resolveApiErrorMessage,
+} from '@logx/i18n';
 
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
 import { useGpsTracking } from '../hooks/useGpsTracking';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { getTrackedExecutionId } from '../services/gpsService';
 import { StopDetailScreen } from './StopDetailScreen';
 import { PODCaptureScreen } from './PODCaptureScreen';
 
@@ -43,12 +50,15 @@ type RouteDetailView = 'route' | 'stop' | 'pod';
 export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
+  const { isOnline } = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [view, setView] = useState<RouteDetailView>('route');
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [gpsWarning, setGpsWarning] = useState<string | null>(null);
 
-  const { data: execution, isLoading } = useQuery({
+  const { data: execution, isLoading, isError, refetch } = useQuery({
     queryKey: ['execution', executionId],
     queryFn: async () => {
       const res = await apiClient.get(`/executions/${executionId}`);
@@ -57,8 +67,37 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     refetchInterval: isTracking ? 5_000 : false,
   });
 
+  const { data: alerts } = useQuery({
+    queryKey: ['execution-alerts', executionId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/executions/${executionId}/alerts`);
+      return res.data.data as Array<{ _id: string; message: string }>;
+    },
+    enabled: Boolean(executionId),
+    staleTime: 15_000,
+  });
+
   // GPS tracking
   useGpsTracking(executionId, isTracking);
+
+  useEffect(() => {
+    void (async () => {
+      const trackedExecutionId = await getTrackedExecutionId();
+      if (trackedExecutionId === executionId) {
+        setIsTracking(true);
+      }
+    })();
+  }, [executionId]);
+
+  useEffect(() => {
+    if (execution?.status === 'IN_PROGRESS') {
+      setIsTracking(true);
+    }
+
+    if (['COMPLETED', 'CANCELLED'].includes(execution?.status ?? '')) {
+      setIsTracking(false);
+    }
+  }, [execution?.status]);
 
   const startRoute = useMutation({
     mutationFn: async () => {
@@ -66,9 +105,17 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     },
     onSuccess: () => {
       setIsTracking(true);
+      setGpsWarning(null);
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
     },
-    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.startRouteFailed')),
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } };
+      const message = axiosErr.response?.data
+        ? resolveApiErrorMessage(axiosErr.response.data, locale)
+        : t('mobile.startRouteFailed');
+      Alert.alert(t('common.errorTitle'), message);
+    },
   });
 
   const completeRoute = useMutation({
@@ -94,6 +141,17 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#2563eb" />
+      </View>
+    );
+  }
+
+  if (isError || !execution) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{t('common.errorMessage')}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => void refetch()}>
+          <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -135,7 +193,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.backText}>← {t('mobile.back')}</Text>
         </TouchableOpacity>
@@ -151,6 +209,46 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       </View>
 
       <ScrollView style={styles.stopList}>
+        {!isOnline && (
+          <View style={styles.alertCard}>
+            <Text style={styles.alertTitle}>{t('mobile.offlineBanner')}</Text>
+            <Text style={styles.alertMessage}>{t('mobile.offlineRouteMessage')}</Text>
+          </View>
+        )}
+        {gpsWarning && (
+          <View style={styles.warningCard}>
+            <Text style={styles.warningTitle}>{t('common.errorTitle')}</Text>
+            <Text style={styles.warningMessage}>{gpsWarning}</Text>
+          </View>
+        )}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>{t('mobile.routeOverview')}</Text>
+          {execution.routeId?.description ? (
+            <Text style={styles.summaryText}>{execution.routeId.description}</Text>
+          ) : (
+            <Text style={styles.summaryMuted}>{t('mobile.noRouteInstructions')}</Text>
+          )}
+          <Text style={styles.summaryMeta}>
+            {t('common.status')}: {execution.status}
+          </Text>
+          {execution.driverId?.phone && (
+            <Text style={styles.summaryMeta}>
+              {t('common.phone')}: {execution.driverId.phone}
+            </Text>
+          )}
+        </View>
+
+        {!!alerts?.length && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>{t('alerts.title')}</Text>
+            {alerts.slice(0, 3).map((alert) => (
+              <Text key={alert._id} style={styles.summaryText}>
+                • {alert.message}
+              </Text>
+            ))}
+          </View>
+        )}
+
         {execution?.stops?.map((stop: {
           _id: string;
           order: number;
@@ -159,6 +257,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
           type: string;
           clientId: { name: string };
           waitingTimeMinutes?: number;
+          instructions?: string;
         }) => (
           <TouchableOpacity
             key={stop._id}
@@ -179,6 +278,11 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
               <Text style={styles.stopClient}>{stop.clientId?.name}</Text>
               <Text style={styles.stopAddress} numberOfLines={1}>{stop.address}</Text>
               <Text style={styles.stopAddress}>{getRouteStopTypeLabel(stop.type, locale)}</Text>
+              {!!stop.instructions && (
+                <Text style={styles.stopInstruction} numberOfLines={2}>
+                  {stop.instructions}
+                </Text>
+              )}
               {stop.waitingTimeMinutes !== undefined && (
                 <Text style={styles.waitingTime}>⏱ {stop.waitingTimeMinutes} min</Text>
               )}
@@ -192,8 +296,14 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         {execution?.status === 'PENDING' || execution?.status === 'ASSIGNED' ? (
           <TouchableOpacity
             style={styles.startBtn}
-            onPress={() => startRoute.mutate()}
-            disabled={startRoute.isPending}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineStartRoute'));
+                return;
+              }
+              startRoute.mutate();
+            }}
+            disabled={startRoute.isPending || !isOnline}
           >
             {startRoute.isPending ? (
               <ActivityIndicator color="#fff" />
@@ -204,8 +314,14 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         ) : allCompleted && execution?.status === 'IN_PROGRESS' ? (
           <TouchableOpacity
             style={styles.completeBtn}
-            onPress={() => completeRoute.mutate()}
-            disabled={completeRoute.isPending}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert(t('common.errorTitle'), t('mobile.offlineCompleteRoute'));
+                return;
+              }
+              completeRoute.mutate();
+            }}
+            disabled={completeRoute.isPending || !isOnline}
           >
             {completeRoute.isPending ? (
               <ActivityIndicator color="#fff" />
@@ -224,7 +340,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#1e3a8a',
     padding: 20,
-    paddingTop: 50,
   },
   backText: { color: '#93c5fd', fontSize: 14, marginBottom: 8 },
   routeName: { fontSize: 20, fontWeight: '800', color: '#fff' },
@@ -272,7 +387,50 @@ const styles = StyleSheet.create({
   stopClient: { fontSize: 14, fontWeight: '600', color: '#111827' },
   stopAddress: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   waitingTime: { fontSize: 11, color: '#2563eb', marginTop: 2 },
+  stopInstruction: { fontSize: 11, color: '#4b5563', marginTop: 4 },
   stopStatus: { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
+  summaryText: { fontSize: 13, color: '#374151', marginBottom: 6 },
+  summaryMuted: { fontSize: 13, color: '#9ca3af' },
+  summaryMeta: { fontSize: 12, color: '#6b7280', marginTop: 4 },
+  alertCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  alertTitle: { fontSize: 13, fontWeight: '700', color: '#92400e' },
+  alertMessage: { fontSize: 12, color: '#92400e', marginTop: 4 },
+  warningCard: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  warningTitle: { fontSize: 13, fontWeight: '700', color: '#b91c1c' },
+  warningMessage: { fontSize: 12, color: '#b91c1c', marginTop: 4 },
   footer: {
     backgroundColor: '#fff',
     padding: 16,
@@ -301,4 +459,22 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f3f4f6',
   },
   backButtonText: { fontSize: 14, color: '#2563eb', fontWeight: '600' },
+  errorText: {
+    color: '#6b7280',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  retryButton: {
+    marginTop: 14,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });
