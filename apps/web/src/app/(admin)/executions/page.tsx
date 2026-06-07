@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { getExecutionStatusLabel, type SupportedLocale } from '@logx/i18n';
+import type { ApiSuccessResponse } from '@logx/shared';
 import { SOCKET_EVENTS } from '@logx/shared';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
@@ -16,20 +18,30 @@ export default function ExecutionsPage() {
   const locale = useLocale() as SupportedLocale;
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const queryClient = useQueryClient();
   const { socket } = useSocket();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['executions', date, status],
+    queryKey: ['executions', date, status, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ date });
+      const params = new URLSearchParams({ date, page: String(page), limit: String(pageSize) });
       if (status) params.set('status', status);
-      const res = await apiClient.get(`/executions?${params.toString()}`);
+      const res = await apiClient.get<ApiSuccessResponse<ExecutionRow[]>>(
+        `/executions?${params.toString()}`
+      );
       return res.data;
     },
     refetchInterval: 30_000,
     refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (data?.meta && data.meta.totalPages > 0 && page > data.meta.totalPages) {
+      setPage(data.meta.totalPages);
+    }
+  }, [data?.meta, page]);
 
   useEffect(() => {
     if (!socket) return;
@@ -47,6 +59,7 @@ export default function ExecutionsPage() {
   }, [queryClient, socket]);
 
   const executions = data?.data ?? [];
+  const meta = data?.meta;
 
   return (
     <div className="p-6 space-y-6">
@@ -62,12 +75,18 @@ export default function ExecutionsPage() {
         <input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => {
+            setDate(e.target.value);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <select
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">{t('allStatuses')}</option>
@@ -111,19 +130,7 @@ export default function ExecutionsPage() {
                   </td>
                 </tr>
               )}
-              {executions.map((exec: {
-                _id: string;
-                scheduledDate: string;
-                scheduledTime: string;
-                status: string;
-                delayMinutes: number;
-                actualStartTime?: string;
-                actualEndTime?: string;
-                totalDurationMinutes?: number;
-                routeId: { name: string };
-                driverId: { name: string };
-                stops?: Array<{ status: string }>;
-              }) => (
+              {executions.map((exec) => (
                 <tr key={exec._id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
                     <div>
@@ -177,7 +184,29 @@ export default function ExecutionsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          page={meta?.page ?? page}
+          totalPages={meta?.totalPages ?? 1}
+          totalItems={meta?.total ?? executions.length}
+          pageSize={meta?.limit ?? pageSize}
+          currentCount={executions.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );
+}
+
+interface ExecutionRow {
+  _id: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  status: string;
+  delayMinutes: number;
+  actualStartTime?: string;
+  actualEndTime?: string;
+  totalDurationMinutes?: number;
+  routeId: { name: string };
+  driverId: { name: string };
+  stops?: Array<{ status: string }>;
 }

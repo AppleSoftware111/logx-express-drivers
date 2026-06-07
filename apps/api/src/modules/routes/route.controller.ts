@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { asyncHandler } from '../../middleware/asyncHandler';
-import { sendCreated, sendSuccess } from '../../utils/apiResponse';
+import { buildMeta, sendCreated, sendPaginated, sendSuccess } from '../../utils/apiResponse';
 import {
   createRoute,
   deleteRoute,
@@ -14,17 +14,24 @@ import {
 
 export const getRoutes = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.user!.companyId;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
   const isActive = req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined;
   const isTemplate =
     req.query.isTemplate !== undefined ? req.query.isTemplate === 'true' : undefined;
 
-  const routes = await listRoutes(companyId, {
-    isActive,
-    isTemplate,
-    driverId: req.query.driverId as string,
-    clientId: req.query.clientId as string,
-  });
-  return sendSuccess(res, routes);
+  const { routes, total } = await listRoutes(
+    companyId,
+    {
+      isActive,
+      isTemplate,
+      driverId: req.query.driverId as string,
+      clientId: req.query.clientId as string,
+    },
+    page,
+    limit
+  );
+  return sendPaginated(res, routes, buildMeta(page, limit, total));
 });
 
 export const getSingleRoute = asyncHandler(async (req: Request, res: Response) => {

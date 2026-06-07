@@ -14,6 +14,7 @@ import {
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
@@ -70,10 +71,12 @@ export default function OperationsPage() {
   const tRoutes = useTranslations('routes');
   const tDashboard = useTranslations('dashboard');
   const [selected, setSelected] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [liveLocations, setLiveLocations] = useState<Record<string, DriverLocation>>({});
   const { socket } = useSocket();
   const hasToken = useHasAccessToken();
   const queryClient = useQueryClient();
+  const pageSize = 8;
 
   const { data: executions, isLoading } = useQuery({
     queryKey: ['today-executions'],
@@ -144,13 +147,30 @@ export default function OperationsPage() {
     });
   }, [executions]);
 
-  useEffect(() => {
-    if (!selected && executions?.length) {
-      setSelected(executions[0]._id);
-    }
-  }, [executions, selected]);
+  const totalExecutions = executions?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalExecutions / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedExecutions = executions?.slice((safePage - 1) * pageSize, safePage * pageSize) ?? [];
 
-  const selectedExecution = executions?.find((e) => e._id === selected);
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
+
+  useEffect(() => {
+    if (!paginatedExecutions.length) {
+      setSelected(null);
+      return;
+    }
+
+    const hasSelectedOnPage = paginatedExecutions.some((execution) => execution._id === selected);
+    if (!hasSelectedOnPage) {
+      setSelected(paginatedExecutions[0]._id);
+    }
+  }, [paginatedExecutions, selected]);
+
+  const selectedExecution = paginatedExecutions.find((e) => e._id === selected);
   const selectedDriverLocation = selectedExecution?.driverId?._id
     ? liveLocations[selectedExecution.driverId._id]
     : undefined;
@@ -178,7 +198,7 @@ export default function OperationsPage() {
               <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
             </div>
           )}
-          {executions?.map((exec) => (
+          {paginatedExecutions.map((exec) => (
             <button
               key={exec._id}
               onClick={() => setSelected(exec._id)}
@@ -218,6 +238,16 @@ export default function OperationsPage() {
             </button>
           ))}
         </div>
+
+        <PaginationControls
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={totalExecutions}
+          pageSize={pageSize}
+          currentCount={paginatedExecutions.length}
+          onPageChange={setPage}
+          className="border-t border-gray-100"
+        />
 
         {selectedExecution && (
           <div className="border-t border-gray-100 px-4 py-4 space-y-4">

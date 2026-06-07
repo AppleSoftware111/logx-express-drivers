@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Building2, Pencil, Plus, Power } from 'lucide-react';
 
-import type { CreateClientInput, UpdateClientInput } from '@logx/shared';
+import type { ApiSuccessResponse, CreateClientInput, UpdateClientInput } from '@logx/shared';
 
 import { ClientFormDialog, type ClientFormInitial } from '@/components/clients/ClientFormDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { queryClient } from '@/lib/queryClient';
@@ -36,21 +37,32 @@ export default function ClientsPage() {
   const sessionReady = useHasAccessToken();
   const [type, setType] = useState('');
   const [isActive, setIsActive] = useState('true');
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientFormInitial | null>(null);
+  const pageSize = 10;
 
-  const { data: clients, isLoading } = useQuery({
-    queryKey: ['clients', type, isActive],
+  const { data, isLoading } = useQuery({
+    queryKey: ['clients', type, isActive, page],
     enabled: sessionReady,
     queryFn: async () => {
-      const params = new URLSearchParams({ isActive });
+      const params = new URLSearchParams({ isActive, page: String(page), limit: String(pageSize) });
       if (type) params.set('type', type);
-      const res = await apiClient.get<{ success: boolean; data: Client[] }>(
+      const res = await apiClient.get<ApiSuccessResponse<Client[]>>(
         `/clients?${params.toString()}`
       );
-      return res.data.data;
+      return res.data;
     },
   });
+
+  const clients = data?.data ?? [];
+  const meta = data?.meta;
+
+  useEffect(() => {
+    if (meta && meta.totalPages > 0 && page > meta.totalPages) {
+      setPage(meta.totalPages);
+    }
+  }, [meta, page]);
 
   const createClient = useMutation({
     mutationFn: async (payload: CreateClientInput) => {
@@ -141,7 +153,10 @@ export default function ClientsPage() {
       <div className="flex items-center gap-3">
         <select
           value={type}
-          onChange={(e) => setType(e.target.value)}
+          onChange={(e) => {
+            setType(e.target.value);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">{t('allTypes')}</option>
@@ -151,14 +166,17 @@ export default function ClientsPage() {
         </select>
         <select
           value={isActive}
-          onChange={(e) => setIsActive(e.target.value)}
+          onChange={(e) => {
+            setIsActive(e.target.value);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="true">{t('activeClients')}</option>
           <option value="false">{t('inactiveClients')}</option>
         </select>
         <span className="text-sm text-gray-400">
-          {t('clientCount', { count: clients?.length ?? 0 })}
+          {t('clientCount', { count: meta?.total ?? clients.length })}
         </span>
       </div>
 
@@ -184,7 +202,7 @@ export default function ClientsPage() {
                   </td>
                 </tr>
               )}
-              {!isLoading && clients?.length === 0 && (
+              {!isLoading && clients.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-0">
                     <EmptyState
@@ -205,7 +223,7 @@ export default function ClientsPage() {
                   </td>
                 </tr>
               )}
-              {clients?.map((client) => (
+              {clients.map((client) => (
                 <tr key={client._id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">{client.name}</td>
                   <td className="px-5 py-3">
@@ -267,6 +285,14 @@ export default function ClientsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          page={meta?.page ?? page}
+          totalPages={meta?.totalPages ?? 1}
+          totalItems={meta?.total ?? clients.length}
+          pageSize={meta?.limit ?? pageSize}
+          currentCount={clients.length}
+          onPageChange={setPage}
+        />
       </div>
 
       <ClientFormDialog

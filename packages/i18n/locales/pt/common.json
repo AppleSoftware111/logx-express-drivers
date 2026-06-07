@@ -56,5 +56,7 @@
   "signature": "Assinatura",
   "receiver": "Recebedor",
   "from": "De",
-  "to": "Até"
+  "to": "Até",
+  "showingRange": "Mostrando {start}-{end} de {total}",
+  "pageOf": "Página {page} de {totalPages}"
 }

@@ -8,15 +8,30 @@ import { Client } from '../../models/Client.model';
 import { User } from '../../models/User.model';
 import { hashPassword } from '../auth/auth.service';
 
-export async function listClients(companyId: string, type?: string, isActive?: boolean) {
+export async function listClients(
+  companyId: string,
+  type?: string,
+  isActive?: boolean,
+  page = 1,
+  limit = 20
+) {
   const filter: Record<string, unknown> = { companyId, isActive: isActive ?? true };
   if (type) filter.type = type;
 
-  return Client.find(filter)
-    .select('-__v')
-    .populate('userId', 'email isActive')
-    .lean()
-    .sort({ name: 1 });
+  const skip = (page - 1) * limit;
+
+  const [clients, total] = await Promise.all([
+    Client.find(filter)
+      .select('-__v')
+      .populate('userId', 'email isActive')
+      .lean()
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit),
+    Client.countDocuments(filter),
+  ]);
+
+  return { clients, total };
 }
 
 export async function getClient(companyId: string, clientId: string) {

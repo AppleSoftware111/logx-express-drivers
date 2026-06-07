@@ -1,11 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 
 import type { SupportedLocale } from '@logx/i18n';
+import type { ApiSuccessResponse } from '@logx/shared';
 import { apiClient } from '@/lib/api';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { queryClient } from '@/lib/queryClient';
 import { formatDateTime } from '@/lib/utils';
 
@@ -29,30 +32,61 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 export default function AlertsPage() {
   const t = useTranslations('alerts');
   const locale = useLocale() as SupportedLocale;
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['alerts'],
+    queryKey: ['alerts', page],
     queryFn: async () => {
-      const res = await apiClient.get<{ success: boolean; data: Alert[] }>('/alerts?limit=100');
-      return res.data.data;
+      const res = await apiClient.get<ApiSuccessResponse<Alert[]>>(
+        `/alerts?page=${page}&limit=${pageSize}`
+      );
+      return res.data;
     },
     refetchInterval: 15_000,
   });
+
+  const { data: unreadCountData } = useQuery({
+    queryKey: ['alerts-unread-count'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ success: boolean; data: { count: number } }>(
+        '/alerts/unread-count'
+      );
+      return res.data.data.count;
+    },
+    refetchInterval: 15_000,
+  });
+
+  const alerts = data?.data ?? [];
+  const meta = data?.meta;
+
+  useEffect(() => {
+    if (meta && meta.totalPages > 0 && page > meta.totalPages) {
+      setPage(meta.totalPages);
+    }
+  }, [meta, page]);
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
       await apiClient.patch(`/alerts/${id}/read`);
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ['alerts-unread-count'] });
+    },
   });
 
   const markAllRead = useMutation({
     mutationFn: async () => {
       await apiClient.patch('/alerts/read-all');
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['alerts'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ['alerts-unread-count'] });
+    },
   });
 
-  const unread = data?.filter((a) => !a.isRead).length ?? 0;
+  const unread = unreadCountData ?? alerts.filter((a) => !a.isRead).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -81,13 +115,13 @@ export default function AlertsPage() {
             <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
           </div>
         )}
-        {!isLoading && data?.length === 0 && (
+        {!isLoading && alerts.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-gray-400">
             <Bell className="w-10 h-10 mb-3 opacity-30" />
             <p>{t('noAlerts')}</p>
           </div>
         )}
-        {data?.map((alert) => (
+        {alerts.map((alert) => (
           <div
             key={alert._id}
             className={`flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors ${
@@ -120,6 +154,16 @@ export default function AlertsPage() {
             )}
           </div>
         ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200">
+        <PaginationControls
+          page={meta?.page ?? page}
+          totalPages={meta?.totalPages ?? 1}
+          totalItems={meta?.total ?? alerts.length}
+          pageSize={meta?.limit ?? pageSize}
+          currentCount={alerts.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

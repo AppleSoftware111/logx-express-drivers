@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { asyncHandler } from '../../middleware/asyncHandler';
-import { sendCreated, sendSuccess } from '../../utils/apiResponse';
+import { buildMeta, sendCreated, sendPaginated, sendSuccess } from '../../utils/apiResponse';
 import {
   createClient,
   deactivateClient,
@@ -13,11 +13,13 @@ import {
 
 export const getClients = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.user!.companyId;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
   const type = req.query.type as string | undefined;
   const isActive =
     req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
-  const clients = await listClients(companyId, type, isActive);
-  return sendSuccess(res, clients);
+  const { clients, total } = await listClients(companyId, type, isActive, page, limit);
+  return sendPaginated(res, clients, buildMeta(page, limit, total));
 });
 
 export const getSingleClient = asyncHandler(async (req: Request, res: Response) => {

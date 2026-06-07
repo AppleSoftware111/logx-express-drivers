@@ -56,5 +56,7 @@
   "signature": "Signature",
   "receiver": "Receiver",
   "from": "From",
-  "to": "To"
+  "to": "To",
+  "showingRange": "Showing {start}-{end} of {total}",
+  "pageOf": "Page {page} of {totalPages}"
 }

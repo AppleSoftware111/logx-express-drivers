@@ -15,6 +15,7 @@ import {
   Legend,
 } from 'recharts';
 
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 
@@ -41,7 +42,9 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState(thirtyDaysAgo.toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
   const [appliedRange, setAppliedRange] = useState({ startDate, endDate });
+  const [page, setPage] = useState(1);
   const sessionReady = useHasAccessToken();
+  const pageSize = 10;
 
   const { data, isLoading } = useQuery({
     queryKey: ['reports-summary', appliedRange],
@@ -58,6 +61,11 @@ export default function ReportsPage() {
     const url = `/api/reports/csv?startDate=${appliedRange.startDate}&endDate=${appliedRange.endDate}`;
     window.open(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}${url}`, '_blank');
   };
+
+  const rows = data ?? [];
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
     <div className="p-6 space-y-6">
@@ -97,7 +105,10 @@ export default function ReportsPage() {
         </div>
         <div className="ml-auto flex items-end">
           <button
-            onClick={() => setAppliedRange({ startDate, endDate })}
+            onClick={() => {
+              setAppliedRange({ startDate, endDate });
+              setPage(1);
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
           >
             {t('apply')}
@@ -148,7 +159,7 @@ export default function ReportsPage() {
                   </td>
                 </tr>
               )}
-              {data?.map((row) => (
+              {paginatedRows.map((row) => (
                 <tr key={row.driverId} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">{row.driverName}</td>
                   <td className="px-5 py-3 text-right text-gray-600">{row.totalExecutions}</td>
@@ -176,6 +187,14 @@ export default function ReportsPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={rows.length}
+          pageSize={pageSize}
+          currentCount={paginatedRows.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

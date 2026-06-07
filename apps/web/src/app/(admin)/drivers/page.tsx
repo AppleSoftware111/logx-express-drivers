@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, Pencil, Power, Truck, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 
-import type { CreateDriverInput, UpdateDriverInput } from '@logx/shared';
+import type { ApiSuccessResponse, CreateDriverInput, UpdateDriverInput } from '@logx/shared';
 
 import { DriverFormDialog, type DriverFormInitial } from '@/components/drivers/DriverFormDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { queryClient } from '@/lib/queryClient';
@@ -39,24 +40,35 @@ export default function DriversPage() {
   const sessionReady = useHasAccessToken();
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [isActive, setIsActive] = useState('true');
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<DriverFormInitial | null>(null);
+  const pageSize = 9;
 
-  const { data: drivers, isLoading } = useQuery({
-    queryKey: ['drivers', onlineOnly, isActive],
+  const { data, isLoading } = useQuery({
+    queryKey: ['drivers', onlineOnly, isActive, page],
     enabled: sessionReady,
     queryFn: async () => {
-      const params = new URLSearchParams({ isActive });
+      const params = new URLSearchParams({ isActive, page: String(page), limit: String(pageSize) });
       if (onlineOnly && isActive === 'true') {
         params.set('online', 'true');
       }
-      const res = await apiClient.get<{ success: boolean; data: Driver[] }>(
+      const res = await apiClient.get<ApiSuccessResponse<Driver[]>>(
         `/drivers?${params.toString()}`
       );
-      return res.data.data;
+      return res.data;
     },
     refetchInterval: 10_000,
   });
+
+  const drivers = data?.data ?? [];
+  const meta = data?.meta;
+
+  useEffect(() => {
+    if (meta && meta.totalPages > 0 && page > meta.totalPages) {
+      setPage(meta.totalPages);
+    }
+  }, [meta, page]);
 
   const { data: vehicles = [] } = useQuery({
     queryKey: ['vehicles'],
@@ -157,7 +169,11 @@ export default function DriversPage() {
       <div className="flex items-center gap-3">
         <select
           value={isActive}
-          onChange={(e) => setIsActive(e.target.value)}
+          onChange={(e) => {
+            setIsActive(e.target.value);
+            setOnlineOnly(false);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="true">{t('activeDrivers')}</option>
@@ -167,14 +183,17 @@ export default function DriversPage() {
           <input
             type="checkbox"
             checked={onlineOnly}
-            onChange={(e) => setOnlineOnly(e.target.checked)}
+            onChange={(e) => {
+              setOnlineOnly(e.target.checked);
+              setPage(1);
+            }}
             className="rounded"
             disabled={isActive !== 'true'}
           />
           {t('onlineOnly')}
         </label>
         <span className="text-sm text-gray-400">
-          {t('driverCount', { count: drivers?.length ?? 0 })}
+          {t('driverCount', { count: meta?.total ?? drivers.length })}
         </span>
       </div>
 
@@ -184,7 +203,7 @@ export default function DriversPage() {
         </div>
       )}
 
-      {!isLoading && drivers?.length === 0 && (
+      {!isLoading && drivers.length === 0 && (
         <EmptyState
           Icon={Users}
           title={t('noDriversYet')}
@@ -203,7 +222,7 @@ export default function DriversPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {drivers?.map((driver) => (
+        {drivers.map((driver) => (
           <div
             key={driver._id}
             className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition-shadow"
@@ -303,6 +322,15 @@ export default function DriversPage() {
           </div>
         ))}
       </div>
+
+      <PaginationControls
+        page={meta?.page ?? page}
+        totalPages={meta?.totalPages ?? 1}
+        totalItems={meta?.total ?? drivers.length}
+        pageSize={meta?.limit ?? pageSize}
+        currentCount={drivers.length}
+        onPageChange={setPage}
+      />
 
       <DriverFormDialog
         key={editingDriver?._id ?? 'create-driver'}

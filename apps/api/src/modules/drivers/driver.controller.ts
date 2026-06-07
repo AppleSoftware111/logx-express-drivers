@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { asyncHandler } from '../../middleware/asyncHandler';
-import { sendCreated, sendSuccess } from '../../utils/apiResponse';
+import { buildMeta, sendCreated, sendPaginated, sendSuccess } from '../../utils/apiResponse';
 import {
   createDriver,
   deactivateDriver,
@@ -13,12 +13,14 @@ import {
 } from './driver.service';
 
 export const getDrivers = asyncHandler(async (req: Request, res: Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
   const companyId = req.user!.companyId;
   const onlineOnly = req.query.online === 'true';
   const isActive =
     req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
-  const drivers = await listDrivers(companyId, onlineOnly, isActive);
-  return sendSuccess(res, drivers);
+  const { drivers, total } = await listDrivers(companyId, onlineOnly, isActive, page, limit);
+  return sendPaginated(res, drivers, buildMeta(page, limit, total));
 });
 
 export const getSingleDriver = asyncHandler(async (req: Request, res: Response) => {

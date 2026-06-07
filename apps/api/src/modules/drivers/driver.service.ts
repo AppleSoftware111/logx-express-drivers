@@ -8,15 +8,30 @@ import { Driver } from '../../models/Driver.model';
 import { User } from '../../models/User.model';
 import { hashPassword } from '../auth/auth.service';
 
-export async function listDrivers(companyId: string, onlineOnly = false, isActive?: boolean) {
+export async function listDrivers(
+  companyId: string,
+  onlineOnly = false,
+  isActive?: boolean,
+  page = 1,
+  limit = 20
+) {
   const filter: Record<string, unknown> = { companyId, isActive: isActive ?? true };
   if (onlineOnly) filter.isOnline = true;
 
-  return Driver.find(filter)
-    .select('-__v')
-    .populate('vehicleId', 'plate model type')
-    .lean()
-    .sort({ name: 1 });
+  const skip = (page - 1) * limit;
+
+  const [drivers, total] = await Promise.all([
+    Driver.find(filter)
+      .select('-__v')
+      .populate('vehicleId', 'plate model type')
+      .lean()
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit),
+    Driver.countDocuments(filter),
+  ]);
+
+  return { drivers, total };
 }
 
 export async function getDriver(companyId: string, driverId: string) {

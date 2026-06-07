@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Eye, Power, Pencil, Plus, Route as RouteIcon } from 'lucide-react';
 
+import type { ApiSuccessResponse } from '@logx/shared';
+
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { queryClient } from '@/lib/queryClient';
@@ -64,18 +67,29 @@ export default function RoutesPage() {
   const t = useTranslations('routes');
   const sessionReady = useHasAccessToken();
   const [isActive, setIsActive] = useState<string>('true');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
-  const { data: routes, isLoading } = useQuery({
-    queryKey: ['routes', isActive],
+  const { data, isLoading } = useQuery({
+    queryKey: ['routes', isActive, page],
     enabled: sessionReady,
     queryFn: async () => {
-      const params = new URLSearchParams({ isActive });
-      const res = await apiClient.get<{ success: boolean; data: Route[] }>(
+      const params = new URLSearchParams({ isActive, page: String(page), limit: String(pageSize) });
+      const res = await apiClient.get<ApiSuccessResponse<Route[]>>(
         `/routes?${params.toString()}`
       );
-      return res.data.data;
+      return res.data;
     },
   });
+
+  const routes = data?.data ?? [];
+  const meta = data?.meta;
+
+  useEffect(() => {
+    if (meta && meta.totalPages > 0 && page > meta.totalPages) {
+      setPage(meta.totalPages);
+    }
+  }, [meta, page]);
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, isActive: active }: { id: string; isActive: boolean }) => {
@@ -105,13 +119,16 @@ export default function RoutesPage() {
       <div className="flex items-center gap-3">
         <select
           value={isActive}
-          onChange={(e) => setIsActive(e.target.value)}
+          onChange={(e) => {
+            setIsActive(e.target.value);
+            setPage(1);
+          }}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="true">Active routes</option>
           <option value="false">Inactive routes</option>
         </select>
-        <span className="text-sm text-gray-400">{routes?.length ?? 0} routes</span>
+        <span className="text-sm text-gray-400">{meta?.total ?? routes.length} routes</span>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">
@@ -136,7 +153,7 @@ export default function RoutesPage() {
                   </td>
                 </tr>
               )}
-              {!isLoading && routes?.length === 0 && (
+              {!isLoading && routes.length === 0 && (
                 <tr>
                   <td colSpan={7} className="p-0">
                     <EmptyState
@@ -156,7 +173,7 @@ export default function RoutesPage() {
                   </td>
                 </tr>
               )}
-              {routes?.map((route) => (
+              {routes.map((route) => (
                 <tr key={route._id} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium text-gray-900">
                     <div>
@@ -238,6 +255,14 @@ export default function RoutesPage() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          page={meta?.page ?? page}
+          totalPages={meta?.totalPages ?? 1}
+          totalItems={meta?.total ?? routes.length}
+          pageSize={meta?.limit ?? pageSize}
+          currentCount={routes.length}
+          onPageChange={setPage}
+        />
       </div>
     </div>
   );

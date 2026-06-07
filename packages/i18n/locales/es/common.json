@@ -56,5 +56,7 @@
   "signature": "Firma",
   "receiver": "Receptor",
   "from": "Desde",
-  "to": "Hasta"
+  "to": "Hasta",
+  "showingRange": "Mostrando {start}-{end} de {total}",
+  "pageOf": "Página {page} de {totalPages}"
 }

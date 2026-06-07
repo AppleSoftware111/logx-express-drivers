@@ -119,7 +119,9 @@ export async function listRoutes(
     isTemplate?: boolean;
     driverId?: string;
     clientId?: string;
-  }
+  },
+  page = 1,
+  limit = 20
 ) {
   const query: Record<string, unknown> = { companyId };
   if (filters.isActive !== undefined) query.isActive = filters.isActive;
@@ -129,14 +131,23 @@ export async function listRoutes(
     query.$or = [{ clientId: filters.clientId }, { 'stops.clientId': filters.clientId }];
   }
 
-  return Route.find(query)
-    .select('-__v')
-    .populate('clientId', 'name type address')
-    .populate('defaultDriverId', 'name phone')
-    .populate('contractId', 'slaMinutes startDate endDate clientId')
-    .populate('stops.clientId', 'name address type')
-    .lean()
-    .sort({ name: 1 });
+  const skip = (page - 1) * limit;
+
+  const [routes, total] = await Promise.all([
+    Route.find(query)
+      .select('-__v')
+      .populate('clientId', 'name type address')
+      .populate('defaultDriverId', 'name phone')
+      .populate('contractId', 'slaMinutes startDate endDate clientId')
+      .populate('stops.clientId', 'name address type')
+      .lean()
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit),
+    Route.countDocuments(query),
+  ]);
+
+  return { routes, total };
 }
 
 export async function getRoute(companyId: string, routeId: string) {
