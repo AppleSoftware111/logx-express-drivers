@@ -8,8 +8,8 @@ import { Driver } from '../../models/Driver.model';
 import { User } from '../../models/User.model';
 import { hashPassword } from '../auth/auth.service';
 
-export async function listDrivers(companyId: string, onlineOnly = false) {
-  const filter: Record<string, unknown> = { companyId, isActive: true };
+export async function listDrivers(companyId: string, onlineOnly = false, isActive?: boolean) {
+  const filter: Record<string, unknown> = { companyId, isActive: isActive ?? true };
   if (onlineOnly) filter.isOnline = true;
 
   return Driver.find(filter)
@@ -156,6 +156,20 @@ export async function deactivateDriver(companyId: string, driverId: string) {
   const driver = await Driver.findOneAndUpdate(
     { companyId, _id: driverId },
     { isActive: false, isOnline: false },
+    { new: true }
+  ).lean();
+  if (!driver) throw new AppError(ApiErrorCode.DRIVER_NOT_FOUND, 404);
+  return driver;
+}
+
+export async function toggleDriverActive(
+  companyId: string,
+  driverId: string,
+  isActive: boolean
+) {
+  const driver = await Driver.findOneAndUpdate(
+    { companyId, _id: driverId },
+    { isActive, ...(isActive ? {} : { isOnline: false }) },
     { new: true }
   ).lean();
   if (!driver) throw new AppError(ApiErrorCode.DRIVER_NOT_FOUND, 404);

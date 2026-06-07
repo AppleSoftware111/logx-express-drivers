@@ -1,6 +1,7 @@
 'use client';
 
-import { AdvancedMarker, Map, Pin, Polyline } from '@vis.gl/react-google-maps';
+import { useEffect, useMemo } from 'react';
+import { AdvancedMarker, Map, Pin, Polyline, useMap } from '@vis.gl/react-google-maps';
 import { useTranslations } from 'next-intl';
 
 import type { RouteStopRow } from '@/components/routes/RouteStopsEditor';
@@ -30,6 +31,30 @@ function getMapCenter(stops: RouteStopRow[]) {
   };
 }
 
+function RouteMapAutoFit({
+  points,
+}: {
+  points: Array<{ lat: number; lng: number }>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length === 0 || typeof google === 'undefined') return;
+
+    if (points.length === 1) {
+      map.setCenter(points[0]);
+      map.setZoom(13);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    points.forEach((point) => bounds.extend(point));
+    map.fitBounds(bounds, 72);
+  }, [map, points]);
+
+  return null;
+}
+
 export function RouteMapPreview({ stops }: RouteMapPreviewProps) {
   const t = useTranslations('routes');
   const validStops = stops
@@ -40,6 +65,10 @@ export function RouteMapPreview({ stops }: RouteMapPreviewProps) {
       lat: Number(stop.lat),
       lng: Number(stop.lng),
     }));
+  const mapPoints = useMemo(
+    () => validStops.map((stop) => ({ lat: stop.lat, lng: stop.lng })),
+    [validStops]
+  );
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -53,12 +82,13 @@ export function RouteMapPreview({ stops }: RouteMapPreviewProps) {
       <div className="h-[420px]">
         <GoogleMapsProvider className="h-full w-full">
           <Map
-            center={getMapCenter(stops)}
+            defaultCenter={getMapCenter(stops)}
             defaultZoom={11}
             mapId="logx-route-planner-map"
             gestureHandling="greedy"
             className="h-full w-full"
           >
+            <RouteMapAutoFit points={mapPoints} />
             {validStops.length > 1 && (
               <Polyline
                 path={validStops.map((stop) => ({ lat: stop.lat, lng: stop.lng }))}

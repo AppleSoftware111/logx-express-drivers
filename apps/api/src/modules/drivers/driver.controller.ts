@@ -7,6 +7,7 @@ import {
   deactivateDriver,
   getDriver,
   listDrivers,
+  toggleDriverActive,
   toggleDriverOnline,
   updateDriver,
 } from './driver.service';
@@ -14,7 +15,9 @@ import {
 export const getDrivers = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.user!.companyId;
   const onlineOnly = req.query.online === 'true';
-  const drivers = await listDrivers(companyId, onlineOnly);
+  const isActive =
+    req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+  const drivers = await listDrivers(companyId, onlineOnly, isActive);
   return sendSuccess(res, drivers);
 });
 
@@ -42,4 +45,10 @@ export const patchDriverOnlineStatus = asyncHandler(async (req: Request, res: Re
 export const deleteDriver = asyncHandler(async (req: Request, res: Response) => {
   await deactivateDriver(req.user!.companyId, req.params.id);
   return sendSuccess(res, { success: true });
+});
+
+export const patchDriverActiveStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { isActive } = req.body as { isActive: boolean };
+  const driver = await toggleDriverActive(req.user!.companyId, req.params.id, isActive);
+  return sendSuccess(res, driver);
 });

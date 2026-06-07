@@ -1,15 +1,18 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowLeft, CalendarDays, Clock, Pencil, RefreshCcw, User } from 'lucide-react';
 
 import { formatDateByLocale, getRouteStopTypeLabel, type SupportedLocale } from '@logx/i18n';
+import { SOCKET_EVENTS } from '@logx/shared';
 import { RouteMapPreview } from '@/components/routes/RouteMapPreview';
 import { apiClient } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
+import { useSocket } from '@/hooks/useSocket';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_LABELS = [
@@ -53,6 +56,8 @@ export default function RouteDetailPage() {
   const t = useTranslations('routes');
   const tCommon = useTranslations('common');
   const locale = useLocale() as SupportedLocale;
+  const localQueryClient = useQueryClient();
+  const { socket } = useSocket();
 
   const { data: route, isLoading } = useQuery({
     queryKey: ['route', id],
@@ -83,6 +88,24 @@ export default function RouteDetailPage() {
       ]);
     },
   });
+
+  useEffect(() => {
+    if (!socket || !id) return;
+
+    const handleExecutionUpdate = (payload: { routeId?: string }) => {
+      if (payload.routeId !== id) return;
+
+      void localQueryClient.invalidateQueries({ queryKey: ['route-schedule', id] });
+      void localQueryClient.invalidateQueries({ queryKey: ['executions'] });
+      void localQueryClient.invalidateQueries({ queryKey: ['today-executions'] });
+    };
+
+    socket.on(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+
+    return () => {
+      socket.off(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+    };
+  }, [id, localQueryClient, socket]);
 
   if (isLoading) {
     return (

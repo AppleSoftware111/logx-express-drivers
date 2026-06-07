@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Building2, Pencil, Plus } from 'lucide-react';
+import { Building2, Pencil, Plus, Power } from 'lucide-react';
 
 import type { CreateClientInput, UpdateClientInput } from '@logx/shared';
 
@@ -35,16 +35,18 @@ export default function ClientsPage() {
   const tCommon = useTranslations('common');
   const sessionReady = useHasAccessToken();
   const [type, setType] = useState('');
+  const [isActive, setIsActive] = useState('true');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientFormInitial | null>(null);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ['clients', type],
+    queryKey: ['clients', type, isActive],
     enabled: sessionReady,
     queryFn: async () => {
-      const params = type ? `?type=${type}` : '';
+      const params = new URLSearchParams({ isActive });
+      if (type) params.set('type', type);
       const res = await apiClient.get<{ success: boolean; data: Client[] }>(
-        `/clients${params}`
+        `/clients?${params.toString()}`
       );
       return res.data.data;
     },
@@ -75,6 +77,19 @@ export default function ClientsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['clients'] });
       setDialogOpen(false);
+    },
+  });
+
+  const toggleClientActive = useMutation({
+    mutationFn: async ({ id, isActive: active }: { id: string; isActive: boolean }) => {
+      const res = await apiClient.patch<{ success: boolean; data: Client }>(
+        `/clients/${id}/active`,
+        { isActive: active }
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 
@@ -133,6 +148,14 @@ export default function ClientsPage() {
           <option value="HOSPITAL">{t('typeHospital')}</option>
           <option value="LABORATORY">{t('typeLaboratory')}</option>
           <option value="OTHER">{t('typeOther')}</option>
+        </select>
+        <select
+          value={isActive}
+          onChange={(e) => setIsActive(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="true">{t('activeClients')}</option>
+          <option value="false">{t('inactiveClients')}</option>
         </select>
         <span className="text-sm text-gray-400">
           {t('clientCount', { count: clients?.length ?? 0 })}
@@ -213,14 +236,31 @@ export default function ClientsPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(client)}
-                      className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                      title={t('editClient')}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(client)}
+                        className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                        title={t('editClient')}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          toggleClientActive.mutate({ id: client._id, isActive: !client.isActive })
+                        }
+                        disabled={toggleClientActive.isPending}
+                        className={`p-2 rounded-lg transition-colors ${
+                          client.isActive
+                            ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                        }`}
+                        title={client.isActive ? t('deactivateClient') : t('activateClient')}
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

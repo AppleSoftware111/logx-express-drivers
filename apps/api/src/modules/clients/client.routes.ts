@@ -9,6 +9,7 @@ import {
   deleteClient,
   getClients,
   getSingleClient,
+  patchClientActive,
   patchClient,
   postClient,
 } from './client.controller';
@@ -31,6 +32,7 @@ router.patch(
   validateBody(updateClientSchema),
   patchClient
 );
+router.patch('/:id/active', requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN), patchClientActive);
 router.delete('/:id', requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN), deleteClient);
 
 export default router;

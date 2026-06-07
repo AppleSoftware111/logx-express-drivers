@@ -16,6 +16,7 @@ import { useLocaleStore } from '../stores/localeStore';
 const DEV_FALLBACK_API_URL = 'http://10.0.2.2:4000';
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const LOCAL_API_URL_PATTERN = /(10\.0\.2\.2|192\.168\.|localhost|127\.0\.0\.1)/i;
 
 type AuthFailureHandler = () => void | Promise<void>;
 let authFailureHandler: AuthFailureHandler | null = null;
@@ -37,6 +38,13 @@ function resolveApiUrl(): string {
 }
 
 export const API_URL = resolveApiUrl();
+
+if (!__DEV__ && LOCAL_API_URL_PATTERN.test(API_URL)) {
+  console.warn(
+    '[mobile-api] Non-development build is using a local/private API URL:',
+    API_URL
+  );
+}
 
 export async function persistAuthSession(accessToken: string, refreshToken?: string | null): Promise<void> {
   await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);

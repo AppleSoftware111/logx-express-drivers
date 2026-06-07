@@ -5,6 +5,8 @@
   "editDriver": "Editar motorista",
   "noDrivers": "Nenhum motorista cadastrado",
   "onlineOnly": "Apenas motoristas online",
+  "activeDrivers": "Motoristas ativos",
+  "inactiveDrivers": "Motoristas inativos",
   "driverCount": "{count, plural, one {# motorista} other {# motoristas}}",
   "noDriversYet": "Nenhum motorista ainda",
   "noDriversDesc": "Adicione o primeiro motorista para atribuir rotas e acompanhar entregas.",
@@ -14,6 +16,8 @@
   "setOffline": "Marcar offline",
   "setOnline": "Marcar online",
   "editTitle": "Editar motorista",
+  "activateDriver": "Ativar motorista",
+  "deactivateDriver": "Desativar motorista",
   "form": {
     "name": "Nome completo",
     "phone": "Telefone",

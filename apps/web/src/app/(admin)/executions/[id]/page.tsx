@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Map, AdvancedMarker, Polyline, Pin } from '@vis.gl/react-google-maps';
 import { AlertTriangle, Pause, Play, SkipBack } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -13,9 +13,11 @@ import {
   getStopStatusLabel,
   type SupportedLocale,
 } from '@logx/i18n';
+import { SOCKET_EVENTS } from '@logx/shared';
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
+import { useSocket } from '@/hooks/useSocket';
 import { formatDateTime, getStatusColor } from '@/lib/utils';
 
 interface GpsPoint {
@@ -82,6 +84,8 @@ export default function ExecutionDetailPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const hasToken = useHasAccessToken();
+  const queryClient = useQueryClient();
+  const { socket } = useSocket();
 
   const { data: execution } = useQuery({
     queryKey: ['execution', id],
@@ -92,6 +96,8 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
   });
 
   const { data: gpsPoints } = useQuery({
@@ -103,6 +109,8 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
   });
 
   const { data: alerts } = useQuery({
@@ -114,7 +122,50 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (!socket || !id) return;
+
+    socket.emit('admin:subscribe_execution', id);
+
+    const handleExecutionUpdate = (payload: { executionId?: string }) => {
+      if (payload.executionId !== id) return;
+
+      void queryClient.invalidateQueries({ queryKey: ['execution', id] });
+      void queryClient.invalidateQueries({ queryKey: ['execution-gps', id] });
+      void queryClient.invalidateQueries({ queryKey: ['execution-alerts', id] });
+    };
+
+    const handleDriverLocation = (payload: { executionId?: string }) => {
+      if (payload.executionId !== id) return;
+
+      void queryClient.invalidateQueries({ queryKey: ['execution-gps', id] });
+    };
+
+    const handleAlert = (payload: { executionId?: string | { _id?: string } }) => {
+      const alertExecutionId =
+        typeof payload.executionId === 'object' && payload.executionId !== null
+          ? payload.executionId._id
+          : payload.executionId;
+      if (alertExecutionId !== id) return;
+
+      void queryClient.invalidateQueries({ queryKey: ['execution-alerts', id] });
+    };
+
+    socket.on(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+    socket.on(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+    socket.on(SOCKET_EVENTS.ADMIN_ALERT, handleAlert);
+
+    return () => {
+      socket.emit('admin:unsubscribe_execution', id);
+      socket.off(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+      socket.off(SOCKET_EVENTS.ADMIN_DRIVER_LOCATION, handleDriverLocation);
+      socket.off(SOCKET_EVENTS.ADMIN_ALERT, handleAlert);
+    };
+  }, [id, queryClient, socket]);
 
   useEffect(() => {
     if (isPlaying && gpsPoints) {

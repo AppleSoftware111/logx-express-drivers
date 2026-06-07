@@ -6,6 +6,7 @@ import { API_URL } from '../services/api';
 interface SocketState {
   socket: Socket | null;
   connected: boolean;
+  lastError: string | null;
   lastToken: string | null;
   setConnected: (connected: boolean) => void;
   connect: (token: string) => void;
@@ -15,6 +16,7 @@ interface SocketState {
 export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
   connected: false,
+  lastError: null,
   lastToken: null,
   setConnected: (connected) => set({ connected }),
   connect: (token) => {
@@ -32,13 +34,15 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const newSocket = io(API_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 8,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1500,
+      reconnectionDelayMax: 10_000,
       autoConnect: true,
     });
 
     newSocket.on('connect', () => {
-      set({ connected: true });
+      set({ connected: true, lastError: null });
     });
 
     newSocket.on('disconnect', () => {
@@ -46,17 +50,16 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     newSocket.on('connect_error', (err) => {
-      if (__DEV__) {
-        console.warn('[mobile-socket]', err.message);
-      }
+      console.warn('[mobile-socket] connect_error', err.message, API_URL);
+      set({ lastError: err.message, connected: false });
     });
 
-    set({ socket: newSocket, lastToken: token, connected: false });
+    set({ socket: newSocket, lastToken: token, connected: false, lastError: null });
   },
   disconnect: () => {
     const { socket } = get();
     socket?.removeAllListeners();
     socket?.disconnect();
-    set({ socket: null, connected: false, lastToken: null });
+    set({ socket: null, connected: false, lastToken: null, lastError: null });
   },
 }));

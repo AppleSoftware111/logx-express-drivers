@@ -8,8 +8,8 @@ import { Client } from '../../models/Client.model';
 import { User } from '../../models/User.model';
 import { hashPassword } from '../auth/auth.service';
 
-export async function listClients(companyId: string, type?: string) {
-  const filter: Record<string, unknown> = { companyId, isActive: true };
+export async function listClients(companyId: string, type?: string, isActive?: boolean) {
+  const filter: Record<string, unknown> = { companyId, isActive: isActive ?? true };
   if (type) filter.type = type;
 
   return Client.find(filter)
@@ -90,6 +90,20 @@ export async function deactivateClient(companyId: string, clientId: string) {
   const client = await Client.findOneAndUpdate(
     { companyId, _id: clientId },
     { isActive: false },
+    { new: true }
+  ).lean();
+  if (!client) throw new AppError(ApiErrorCode.CLIENT_NOT_FOUND, 404);
+  return client;
+}
+
+export async function toggleClientActive(
+  companyId: string,
+  clientId: string,
+  isActive: boolean
+) {
+  const client = await Client.findOneAndUpdate(
+    { companyId, _id: clientId },
+    { isActive },
     { new: true }
   ).lean();
   if (!client) throw new AppError(ApiErrorCode.CLIENT_NOT_FOUND, 404);

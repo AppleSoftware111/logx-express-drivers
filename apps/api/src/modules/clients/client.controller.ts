@@ -7,13 +7,16 @@ import {
   deactivateClient,
   getClient,
   listClients,
+  toggleClientActive,
   updateClient,
 } from './client.service';
 
 export const getClients = asyncHandler(async (req: Request, res: Response) => {
   const companyId = req.user!.companyId;
   const type = req.query.type as string | undefined;
-  const clients = await listClients(companyId, type);
+  const isActive =
+    req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
+  const clients = await listClients(companyId, type, isActive);
   return sendSuccess(res, clients);
 });
 
@@ -35,4 +38,10 @@ export const patchClient = asyncHandler(async (req: Request, res: Response) => {
 export const deleteClient = asyncHandler(async (req: Request, res: Response) => {
   await deactivateClient(req.user!.companyId, req.params.id);
   return sendSuccess(res, { success: true });
+});
+
+export const patchClientActive = asyncHandler(async (req: Request, res: Response) => {
+  const { isActive } = req.body as { isActive: boolean };
+  const client = await toggleClientActive(req.user!.companyId, req.params.id, isActive);
+  return sendSuccess(res, client);
 });

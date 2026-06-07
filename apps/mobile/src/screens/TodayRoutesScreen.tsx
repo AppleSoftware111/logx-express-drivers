@@ -53,6 +53,8 @@ export function TodayRoutesScreen({ onSelectExecution, onOpenSettings }: Props) 
       return res.data.data;
     },
     refetchInterval: 30_000,
+    refetchOnReconnect: true,
+    refetchOnMount: 'always',
   });
 
   const renderItem = ({ item }: { item: Execution }) => {

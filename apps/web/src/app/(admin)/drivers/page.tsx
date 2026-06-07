@@ -34,19 +34,24 @@ interface Vehicle {
 
 export default function DriversPage() {
   const t = useTranslations('drivers');
+  const tCommon = useTranslations('common');
   const locale = useLocale();
   const sessionReady = useHasAccessToken();
   const [onlineOnly, setOnlineOnly] = useState(false);
+  const [isActive, setIsActive] = useState('true');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<DriverFormInitial | null>(null);
 
   const { data: drivers, isLoading } = useQuery({
-    queryKey: ['drivers', onlineOnly],
+    queryKey: ['drivers', onlineOnly, isActive],
     enabled: sessionReady,
     queryFn: async () => {
-      const params = onlineOnly ? '?online=true' : '';
+      const params = new URLSearchParams({ isActive });
+      if (onlineOnly && isActive === 'true') {
+        params.set('online', 'true');
+      }
       const res = await apiClient.get<{ success: boolean; data: Driver[] }>(
-        `/drivers${params}`
+        `/drivers?${params.toString()}`
       );
       return res.data.data;
     },
@@ -97,6 +102,13 @@ export default function DriversPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['drivers'] }),
   });
 
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, isActive: active }: { id: string; isActive: boolean }) => {
+      await apiClient.patch(`/drivers/${id}/active`, { isActive: active });
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['drivers'] }),
+  });
+
   const openCreate = () => {
     setEditingDriver(null);
     setDialogOpen(true);
@@ -143,12 +155,21 @@ export default function DriversPage() {
       </div>
 
       <div className="flex items-center gap-3">
+        <select
+          value={isActive}
+          onChange={(e) => setIsActive(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="true">{t('activeDrivers')}</option>
+          <option value="false">{t('inactiveDrivers')}</option>
+        </select>
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input
             type="checkbox"
             checked={onlineOnly}
             onChange={(e) => setOnlineOnly(e.target.checked)}
             className="rounded"
+            disabled={isActive !== 'true'}
           />
           {t('onlineOnly')}
         </label>
@@ -218,7 +239,7 @@ export default function DriversPage() {
                   onClick={() =>
                     toggleOnline.mutate({ id: driver._id, isOnline: !driver.isOnline })
                   }
-                  disabled={toggleOnline.isPending}
+                  disabled={toggleOnline.isPending || !driver.isActive}
                   className={`p-2 rounded-lg transition-colors ${
                     driver.isOnline
                       ? 'bg-green-50 text-green-600 hover:bg-green-100'
@@ -227,6 +248,21 @@ export default function DriversPage() {
                   title={driver.isOnline ? t('setOffline') : t('setOnline')}
                 >
                   <Power className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    toggleActive.mutate({ id: driver._id, isActive: !driver.isActive })
+                  }
+                  disabled={toggleActive.isPending}
+                  className={`rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${
+                    driver.isActive
+                      ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  }`}
+                  title={driver.isActive ? t('deactivateDriver') : t('activateDriver')}
+                >
+                  {driver.isActive ? t('deactivateDriver') : t('activateDriver')}
                 </button>
               </div>
             </div>
@@ -253,6 +289,17 @@ export default function DriversPage() {
                 }).format(new Date(driver.currentLocation.updatedAt))}
               </div>
             )}
+            <div className="mt-3">
+              <span
+                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                  driver.isActive
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {driver.isActive ? tCommon('active') : tCommon('inactive')}
+              </span>
+            </div>
           </div>
         ))}
       </div>

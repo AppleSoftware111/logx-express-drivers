@@ -9,6 +9,7 @@ import {
   deleteDriver,
   getDrivers,
   getSingleDriver,
+  patchDriverActiveStatus,
   patchDriver,
   patchDriverOnlineStatus,
   postDriver,
@@ -31,6 +32,11 @@ router.patch(
   requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),
   validateBody(updateDriverSchema),
   patchDriver
+);
+router.patch(
+  '/:id/active',
+  requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  patchDriverActiveStatus
 );
 router.patch(
   '/:id/online',

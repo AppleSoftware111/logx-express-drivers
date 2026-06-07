@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
 
 import { getExecutionStatusLabel, type SupportedLocale } from '@logx/i18n';
+import { SOCKET_EVENTS } from '@logx/shared';
 import { apiClient } from '@/lib/api';
+import { useSocket } from '@/hooks/useSocket';
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
 export default function ExecutionsPage() {
@@ -14,6 +16,8 @@ export default function ExecutionsPage() {
   const locale = useLocale() as SupportedLocale;
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState('');
+  const queryClient = useQueryClient();
+  const { socket } = useSocket();
 
   const { data, isLoading } = useQuery({
     queryKey: ['executions', date, status],
@@ -23,7 +27,24 @@ export default function ExecutionsPage() {
       const res = await apiClient.get(`/executions?${params.toString()}`);
       return res.data;
     },
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleExecutionUpdate = () => {
+      void queryClient.invalidateQueries({ queryKey: ['executions'] });
+      void queryClient.invalidateQueries({ queryKey: ['today-executions'] });
+    };
+
+    socket.on(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+
+    return () => {
+      socket.off(SOCKET_EVENTS.ADMIN_EXECUTION_UPDATE, handleExecutionUpdate);
+    };
+  }, [queryClient, socket]);
 
   const executions = data?.data ?? [];
 

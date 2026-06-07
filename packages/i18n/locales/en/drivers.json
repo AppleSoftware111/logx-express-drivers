@@ -21,6 +21,8 @@
     "active": "Active driver"
   },
   "onlineOnly": "Only online drivers",
+  "activeDrivers": "Active drivers",
+  "inactiveDrivers": "Inactive drivers",
   "driverCount": "{count, plural, one {# driver} other {# drivers}}",
   "noDriversYet": "No drivers yet",
   "noDriversDesc": "Add the first driver to assign routes and track deliveries.",
@@ -29,5 +31,7 @@
   "lastSeen": "Last seen",
   "setOffline": "Set offline",
   "setOnline": "Set online",
-  "editTitle": "Edit driver"
+  "editTitle": "Edit driver",
+  "activateDriver": "Activate driver",
+  "deactivateDriver": "Deactivate driver"
 }

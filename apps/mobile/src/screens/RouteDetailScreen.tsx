@@ -64,7 +64,13 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       const res = await apiClient.get(`/executions/${executionId}`);
       return res.data.data;
     },
-    refetchInterval: isTracking ? 5_000 : false,
+    refetchInterval: (query) => {
+      const currentExecution = query.state.data as { status?: string } | undefined;
+      if (!currentExecution?.status) return 15_000;
+      if (['COMPLETED', 'CANCELLED'].includes(currentExecution.status)) return false;
+      return isTracking ? 5_000 : 15_000;
+    },
+    refetchOnReconnect: true,
   });
 
   const { data: alerts } = useQuery({
@@ -75,6 +81,8 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     },
     enabled: Boolean(executionId),
     staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchOnReconnect: true,
   });
 
   // GPS tracking

@@ -21,6 +21,8 @@
     "active": "Conductor activo"
   },
   "onlineOnly": "Solo conductores en línea",
+  "activeDrivers": "Conductores activos",
+  "inactiveDrivers": "Conductores inactivos",
   "driverCount": "{count, plural, one {# conductor} other {# conductores}}",
   "noDriversYet": "Todavía no hay conductores",
   "noDriversDesc": "Añada el primer conductor para asignar rutas y seguir las entregas.",
@@ -29,5 +31,7 @@
   "lastSeen": "Última vez visto",
   "setOffline": "Marcar sin conexión",
   "setOnline": "Marcar en línea",
-  "editTitle": "Editar conductor"
+  "editTitle": "Editar conductor",
+  "activateDriver": "Activar conductor",
+  "deactivateDriver": "Desactivar conductor"
 }

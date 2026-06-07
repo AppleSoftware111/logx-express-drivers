@@ -24,6 +24,7 @@ export function useDriverRealtime() {
   const socket = useSocketStore((state) => state.socket);
   const connect = useSocketStore((state) => state.connect);
   const disconnect = useSocketStore((state) => state.disconnect);
+  const lastError = useSocketStore((state) => state.lastError);
 
   useEffect(() => {
     if (!isAuthenticated || !accessToken) {
@@ -53,6 +54,8 @@ export function useDriverRealtime() {
 
     const invalidateExecutionState = (payload?: DriverRouteRealtimePayload) => {
       void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
+      void queryClient.invalidateQueries({ queryKey: ['execution'] });
+      void queryClient.invalidateQueries({ queryKey: ['execution-alerts'] });
 
       if (payload?.executionId) {
         void queryClient.invalidateQueries({ queryKey: ['execution', payload.executionId] });
@@ -63,6 +66,15 @@ export function useDriverRealtime() {
     const handleConnect = () => {
       socket.emit(SOCKET_EVENTS.DRIVER_ONLINE);
       void emitPresenceLocation();
+      invalidateExecutionState();
+    };
+
+    const handleDisconnect = (reason: string) => {
+      console.warn('[mobile-socket] disconnected', reason);
+    };
+
+    const handleConnectError = (error: Error) => {
+      console.warn('[mobile-socket] reconnect_failed', error.message);
       invalidateExecutionState();
     };
 
@@ -83,6 +95,8 @@ export function useDriverRealtime() {
     };
 
     socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
     socket.on(SOCKET_EVENTS.DRIVER_ROUTE_ASSIGNED, handleRouteChanged);
     socket.on(SOCKET_EVENTS.DRIVER_ROUTE_UPDATED, handleRouteChanged);
     socket.on(SOCKET_EVENTS.DRIVER_ROUTE_CANCELLED, handleRouteChanged);
@@ -96,6 +110,8 @@ export function useDriverRealtime() {
 
     return () => {
       socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
       socket.off(SOCKET_EVENTS.DRIVER_ROUTE_ASSIGNED, handleRouteChanged);
       socket.off(SOCKET_EVENTS.DRIVER_ROUTE_UPDATED, handleRouteChanged);
       socket.off(SOCKET_EVENTS.DRIVER_ROUTE_CANCELLED, handleRouteChanged);
@@ -103,4 +119,10 @@ export function useDriverRealtime() {
       appStateSubscription.remove();
     };
   }, [isAuthenticated, queryClient, socket]);
+
+  useEffect(() => {
+    if (lastError) {
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
+    }
+  }, [lastError, queryClient]);
 }
