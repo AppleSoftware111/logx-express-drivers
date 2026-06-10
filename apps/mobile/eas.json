@@ -18,13 +18,14 @@
     },
     "preview": {
       "extends": "base",
+      "withoutCredentials": true,
       "distribution": "internal",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "APP_VARIANT": "preview",
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4000"
+        "EXPO_PUBLIC_API_URL": "https://d1kwb1qqt0y1oi.cloudfront.net/"
       }
     },
     "preview-lan": {
@@ -36,6 +37,7 @@
     },
     "production": {
       "extends": "base",
+      "credentialsSource": "local",
       "env": {
         "APP_VARIANT": "production"
       },

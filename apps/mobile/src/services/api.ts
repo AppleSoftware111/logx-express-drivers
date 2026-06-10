@@ -16,10 +16,21 @@ import { useLocaleStore } from '../stores/localeStore';
 const DEV_FALLBACK_API_URL = 'http://10.0.2.2:4000';
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const USER_PROFILE_KEY = 'sessionUser';
 const LOCAL_API_URL_PATTERN = /(10\.0\.2\.2|192\.168\.|localhost|127\.0\.0\.1)/i;
+export const UPLOAD_REQUEST_TIMEOUT_MS = 60_000;
 
 type AuthFailureHandler = () => void | Promise<void>;
 let authFailureHandler: AuthFailureHandler | null = null;
+
+export type StoredAuthUser = {
+  id: string;
+  email: string;
+  role: string;
+  companyId?: string;
+  driverId?: string;
+  locale?: string;
+};
 
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -54,10 +65,15 @@ export async function persistAuthSession(accessToken: string, refreshToken?: str
   }
 }
 
+export async function persistStoredUser(user: StoredAuthUser): Promise<void> {
+  await SecureStore.setItemAsync(USER_PROFILE_KEY, JSON.stringify(user));
+}
+
 export async function clearAuthSession(): Promise<void> {
   await Promise.all([
     SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    SecureStore.deleteItemAsync(USER_PROFILE_KEY),
   ]);
 }
 
@@ -73,8 +89,42 @@ export async function getStoredAuthSession(): Promise<{
   return { accessToken, refreshToken };
 }
 
+export async function getStoredUser(): Promise<StoredAuthUser | null> {
+  const raw = await SecureStore.getItemAsync(USER_PROFILE_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as StoredAuthUser;
+  } catch {
+    await SecureStore.deleteItemAsync(USER_PROFILE_KEY);
+    return null;
+  }
+}
+
 export function registerAuthFailureHandler(handler: AuthFailureHandler | null): void {
   authFailureHandler = handler;
+}
+
+export function isRecoverableNetworkError(error: unknown): boolean {
+  const err = error as {
+    code?: string;
+    message?: string;
+    response?: { status?: number };
+  };
+
+  if (err.message === 'Missing refresh token') return false;
+  if (!err.response) return true;
+  if (err.code === 'ECONNABORTED') return true;
+
+  return typeof err.response.status === 'number' && err.response.status >= 500;
+}
+
+export function isDefinitiveAuthFailure(error: unknown): boolean {
+  const err = error as {
+    response?: { status?: number };
+  };
+
+  return err.response?.status === 401 || err.response?.status === 403;
 }
 
 export const apiClient = create({
@@ -131,10 +181,12 @@ apiClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }
-      } catch {
-        await clearAuthSession();
-        useAuthStore.getState().logout();
-        await authFailureHandler?.();
+      } catch (refreshError) {
+        if (!isRecoverableNetworkError(refreshError)) {
+          await clearAuthSession();
+          useAuthStore.getState().logout();
+          await authFailureHandler?.();
+        }
       }
     }
 

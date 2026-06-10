@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 
+import { DRIVER_LOCATION_STALE_WINDOW_MS } from '@logx/shared';
+
 import { authenticate } from '../../middleware/auth';
 import { asyncHandler } from '../../middleware/asyncHandler';
 import { sendSuccess } from '../../utils/apiResponse';
@@ -90,8 +92,13 @@ router.get(
   '/live-drivers',
   asyncHandler(async (req: Request, res: Response) => {
     const companyId = req.user!.companyId;
+    const staleCutoff = new Date(Date.now() - DRIVER_LOCATION_STALE_WINDOW_MS);
 
-    const drivers = await Driver.find({ companyId, isOnline: true, isActive: true })
+    const drivers = await Driver.find({
+      companyId,
+      isActive: true,
+      $or: [{ isOnline: true }, { 'currentLocation.updatedAt': { $gte: staleCutoff } }],
+    })
       .select('name currentLocation vehicleId')
       .populate('vehicleId', 'plate type')
       .lean();

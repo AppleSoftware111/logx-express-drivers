@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { apiClient } from '../services/api';
+import { stopBackgroundGps } from '../services/gpsService';
 
 interface Stop {
   _id: string;
@@ -36,6 +37,7 @@ export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: P
       await apiClient.patch(`/executions/${executionId}/status`, { status: 'COMPLETED' });
     },
     onSuccess: () => {
+      void stopBackgroundGps();
       void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
       onDone();
     },

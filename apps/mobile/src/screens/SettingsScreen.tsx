@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { SupportedLocale } from '@logx/i18n';
 
-import { apiClient, clearAuthSession } from '../services/api';
+import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLocaleStore } from '../stores/localeStore';
 
@@ -52,6 +52,9 @@ export function SettingsScreen({ onClose }: Props) {
     try {
       await setLocale(value);
       await apiClient.patch('/auth/me/preferences', { locale: value });
+      if (user) {
+        await persistStoredUser({ ...user, locale: value });
+      }
     } catch {
       Alert.alert(t('common.errorTitle'), t('mobile.languageUpdateFailed'));
     } finally {

@@ -19,6 +19,7 @@
   "liveNow": "Live now",
   "updatedRecently": "Updated recently",
   "staleLocation": "Stale location",
+  "offlineLocation": "Tracking offline",
   "locationUnknown": "Awaiting location",
   "lastUpdated": "Updated: {value}",
   "recentAlerts": "Recent alerts",

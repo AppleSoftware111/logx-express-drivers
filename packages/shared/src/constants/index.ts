@@ -6,6 +6,10 @@ export const GPS_EMIT_INTERVAL_MS = 5_000;
 
 export const GPS_TTL_DAYS = 90;
 
+export const DRIVER_LOCATION_LIVE_WINDOW_MS = 60_000;
+export const DRIVER_LOCATION_RECENT_WINDOW_MS = 5 * 60_000;
+export const DRIVER_LOCATION_STALE_WINDOW_MS = 30 * 60_000;
+
 export const DELAY_THRESHOLDS_MINUTES = [15, 30, 60] as const;
 
 export const PAGINATION_DEFAULT_LIMIT = 20;

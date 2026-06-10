@@ -6,8 +6,10 @@ import type { Multer } from 'multer';
 import multer from 'multer';
 
 import { POD_ALLOWED_MIME_TYPES, POD_MAX_FILE_SIZE_BYTES, S3_PRESIGNED_URL_EXPIRES_SECONDS } from '@logx/shared';
+import { ApiErrorCode } from '@logx/i18n';
 
 import { S3_BUCKET, s3Client } from '../config/s3';
+import { AppError } from '../middleware/errorHandler';
 
 export const podUpload: Multer = multer({
   storage: multer.memoryStorage(),
@@ -16,7 +18,7 @@ export const podUpload: Multer = multer({
     if ((POD_ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`File type not allowed: ${file.mimetype}`));
+      cb(new AppError(ApiErrorCode.POD_FILE_INVALID_TYPE, 400));
     }
   },
 });
@@ -29,15 +31,31 @@ export async function uploadFileToS3(
   const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
   const key = `${folder}/${randomUUID()}.${ext}`;
 
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: mimeType,
-      ServerSideEncryption: 'AES256',
-    })
-  );
+  try {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+        ServerSideEncryption: 'AES256',
+      })
+    );
+    console.info('[pod-upload] uploaded file to s3', {
+      folder,
+      key,
+      mimeType,
+      size: buffer.byteLength,
+    });
+  } catch (error) {
+    console.error('[pod-upload] s3 upload failed', {
+      folder,
+      mimeType,
+      size: buffer.byteLength,
+      error,
+    });
+    throw new AppError(ApiErrorCode.POD_UPLOAD_FAILED, 502);
+  }
 
   return key;
 }

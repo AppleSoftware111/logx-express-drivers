@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Map, AdvancedMarker, Polyline, Pin } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Polyline, Pin, useMap } from '@vis.gl/react-google-maps';
 import { AlertTriangle, Pause, Play, SkipBack } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 
@@ -18,6 +18,7 @@ import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
+import { getLocationFreshnessState } from '@/lib/locationFreshness';
 import { formatDateTime, getStatusColor } from '@/lib/utils';
 
 interface GpsPoint {
@@ -37,7 +38,13 @@ interface ExecutionDetail {
   actualEndTime?: string;
   totalDurationMinutes?: number;
   routeId: { name: string; description?: string };
-  driverId: { name: string; phone?: string };
+  driverId: {
+    _id?: string;
+    name: string;
+    phone?: string;
+    isOnline?: boolean;
+    currentLocation?: { lat: number; lng: number; updatedAt?: string };
+  };
   originalDriverId: { name: string };
   isSubstitution: boolean;
   contractId?: { slaMinutes?: number; clientId?: { name?: string } };
@@ -71,16 +78,50 @@ interface ExecutionAlert {
   createdAt: string;
 }
 
+interface DriverLocationPayload {
+  driverId: string;
+  executionId?: string;
+  lat: number;
+  lng: number;
+  timestamp?: string;
+}
+
 const REPLAY_SPEED_OPTIONS = [1, 2, 5] as const;
+
+function ExecutionMapAutoFit({
+  points,
+}: {
+  points: Array<{ lat: number; lng: number }>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length === 0 || typeof google === 'undefined') return;
+
+    if (points.length === 1) {
+      map.setCenter(points[0]);
+      map.setZoom(13);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    points.forEach((point) => bounds.extend(point));
+    map.fitBounds(bounds, 72);
+  }, [map, points]);
+
+  return null;
+}
 
 export default function ExecutionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const t = useTranslations('executions');
   const tCommon = useTranslations('common');
+  const tDashboard = useTranslations('dashboard');
   const locale = useLocale() as SupportedLocale;
   const [replayIndex, setReplayIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState<(typeof REPLAY_SPEED_OPTIONS)[number]>(1);
+  const [liveMarker, setLiveMarker] = useState<{ lat: number; lng: number; timestamp?: string } | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const hasToken = useHasAccessToken();
@@ -139,10 +180,13 @@ export default function ExecutionDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['execution-alerts', id] });
     };
 
-    const handleDriverLocation = (payload: { executionId?: string }) => {
+    const handleDriverLocation = (payload: DriverLocationPayload) => {
       if (payload.executionId !== id) return;
-
-      void queryClient.invalidateQueries({ queryKey: ['execution-gps', id] });
+      setLiveMarker({
+        lat: payload.lat,
+        lng: payload.lng,
+        timestamp: payload.timestamp,
+      });
     };
 
     const handleAlert = (payload: { executionId?: string | { _id?: string } }) => {
@@ -168,6 +212,19 @@ export default function ExecutionDetailPage() {
   }, [id, queryClient, socket]);
 
   useEffect(() => {
+    if (
+      typeof execution?.driverId?.currentLocation?.lat === 'number' &&
+      typeof execution?.driverId?.currentLocation?.lng === 'number'
+    ) {
+      setLiveMarker({
+        lat: execution.driverId.currentLocation.lat,
+        lng: execution.driverId.currentLocation.lng,
+        timestamp: execution.driverId.currentLocation.updatedAt,
+      });
+    }
+  }, [execution?.driverId?.currentLocation?.lat, execution?.driverId?.currentLocation?.lng, execution?.driverId?.currentLocation?.updatedAt]);
+
+  useEffect(() => {
     if (isPlaying && gpsPoints) {
       intervalRef.current = setInterval(() => {
         setReplayIndex((prev) => {
@@ -186,18 +243,32 @@ export default function ExecutionDetailPage() {
     };
   }, [isPlaying, replaySpeed, gpsPoints]);
 
-  const pathPoints =
-    gpsPoints?.map((p) => ({
-      lat: p.location.coordinates[1],
-      lng: p.location.coordinates[0],
-    })) ?? [];
+  const pathPoints = useMemo(
+    () =>
+      gpsPoints?.map((p) => ({
+        lat: p.location.coordinates[1],
+        lng: p.location.coordinates[0],
+      })) ?? [],
+    [gpsPoints]
+  );
 
-  const currentMarker = gpsPoints?.[replayIndex]
+  const replayMarker = gpsPoints?.[replayIndex]
     ? {
         lat: gpsPoints[replayIndex].location.coordinates[1],
         lng: gpsPoints[replayIndex].location.coordinates[0],
       }
     : null;
+  const latestRecordedMarker = pathPoints[pathPoints.length - 1] ?? null;
+  const currentMarker = isPlaying || replayIndex > 0 ? replayMarker : liveMarker ?? latestRecordedMarker;
+  const markerFreshness = getLocationFreshnessState(liveMarker?.timestamp);
+  const visiblePoints = useMemo(
+    () => [
+      ...pathPoints,
+      ...(currentMarker ? [currentMarker] : []),
+      ...(execution?.stops.map((stop) => ({ lat: stop.location.lat, lng: stop.location.lng })) ?? []),
+    ],
+    [currentMarker, execution?.stops, pathPoints]
+  );
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -250,6 +321,17 @@ export default function ExecutionDetailPage() {
               </p>
             </div>
           </div>
+          {liveMarker?.timestamp && (
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className={`h-2.5 w-2.5 rounded-full ${markerFreshness.dotClassName}`} />
+              <span className={markerFreshness.textClassName}>{tDashboard(markerFreshness.labelKey)}</span>
+              <span className="text-gray-400">
+                {tDashboard('lastUpdated', {
+                  value: formatDateTime(liveMarker.timestamp, locale),
+                })}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
@@ -415,6 +497,7 @@ export default function ExecutionDetailPage() {
               gestureHandling="greedy"
               className="w-full h-full"
             >
+              <ExecutionMapAutoFit points={visiblePoints} />
               {/* GPS path polyline */}
               {pathPoints.length > 1 && (
                 <Polyline

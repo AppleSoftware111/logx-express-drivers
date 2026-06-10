@@ -31,6 +31,8 @@
   "completeStop": "Complete stop",
   "podSuccess": "POD captured and stop completed!",
   "podSubmitFailed": "Failed to submit POD. Please try again.",
+  "podUploadTimeout": "The proof photo upload took too long. Check your connection and try again.",
+  "podPhotoTooLarge": "The proof photo is too large. Maximum size is {maxSizeMb} MB.",
   "cameraPermissionDenied": "Camera access is required to capture POD.",
   "stopTimeline": "Timeline",
   "actions": "Actions",

@@ -34,6 +34,9 @@
   "STOP_MUST_BE_ARRIVED": "Stop must be in ARRIVED status before starting",
   "STOP_MUST_BE_ARRIVED_OR_IN_PROGRESS": "Stop must be ARRIVED or IN_PROGRESS to complete",
   "POD_FILE_REQUIRED": "At least one file (photo or signature) is required",
+  "POD_FILE_TOO_LARGE": "The proof photo is too large. Maximum size is {maxSizeMb} MB.",
+  "POD_FILE_INVALID_TYPE": "The proof photo format is not supported. Use JPG, PNG, or WEBP.",
+  "POD_UPLOAD_FAILED": "The proof photo could not be uploaded. Please try again.",
   "POD_KEY_REQUIRED": "key query parameter is required",
   "INTERNAL_ERROR": "Internal server error"
 }

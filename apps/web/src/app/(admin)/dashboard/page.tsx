@@ -13,6 +13,7 @@ import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
 import { queryClient } from '@/lib/queryClient';
+import { getLocationFreshnessState } from '@/lib/locationFreshness';
 import type { SupportedLocale } from '@logx/i18n';
 
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
@@ -65,23 +66,6 @@ interface AdminExecutionUpdatePayload {
 }
 
 const DEFAULT_DASHBOARD_CENTER = { lat: -14.235, lng: -51.9253 };
-
-function getFreshnessState(updatedAt?: string) {
-  if (!updatedAt) {
-    return { labelKey: 'locationUnknown', dotClassName: 'bg-gray-300', textClassName: 'text-gray-400' };
-  }
-
-  const ageMs = Date.now() - new Date(updatedAt).getTime();
-  if (ageMs <= 60_000) {
-    return { labelKey: 'liveNow', dotClassName: 'bg-green-500', textClassName: 'text-green-600' };
-  }
-
-  if (ageMs <= 5 * 60_000) {
-    return { labelKey: 'updatedRecently', dotClassName: 'bg-amber-400', textClassName: 'text-amber-600' };
-  }
-
-  return { labelKey: 'staleLocation', dotClassName: 'bg-gray-400', textClassName: 'text-gray-500' };
-}
 
 function DriverMapAutoFit({
   points,
@@ -369,7 +353,7 @@ export default function DashboardPage() {
                   <div className="px-4 py-6 text-sm text-gray-400">{t('noDriverLocations')}</div>
                 ) : (
                   liveDrivers.map((driver) => {
-                    const freshness = getFreshnessState(driver.currentLocation?.updatedAt);
+                    const freshness = getLocationFreshnessState(driver.currentLocation?.updatedAt);
 
                     return (
                       <div key={driver._id} className="px-4 py-3">

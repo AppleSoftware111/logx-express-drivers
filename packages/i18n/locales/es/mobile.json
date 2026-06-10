@@ -31,6 +31,8 @@
   "completeStop": "Completar parada",
   "podSuccess": "Comprobante capturado y parada completada.",
   "podSubmitFailed": "No se pudo enviar el comprobante. Inténtelo de nuevo.",
+  "podUploadTimeout": "La carga de la foto del comprobante tardó demasiado. Revise la conexión e inténtelo de nuevo.",
+  "podPhotoTooLarge": "La foto del comprobante es demasiado grande. El tamaño máximo es {maxSizeMb} MB.",
   "cameraPermissionDenied": "Se necesita acceso a la cámara para capturar el comprobante.",
   "stopTimeline": "Línea de tiempo",
   "actions": "Acciones",

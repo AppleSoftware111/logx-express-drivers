@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Map, AdvancedMarker, Pin, Polyline } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, Pin, Polyline, useMap } from '@vis.gl/react-google-maps';
 import { useLocale, useTranslations } from 'next-intl';
 
 import {
@@ -18,6 +18,7 @@ import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
+import { getLocationFreshnessState } from '@/lib/locationFreshness';
 import { formatDateTime, getDelayColor, getDelayLabel, getStatusColor } from '@/lib/utils';
 
 interface Execution {
@@ -63,6 +64,30 @@ interface AdminExecutionUpdatePayload {
   driverId?: string;
   status?: string;
   timestamp?: string;
+}
+
+function OperationsMapAutoFit({
+  points,
+}: {
+  points: Array<{ lat: number; lng: number }>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length === 0 || typeof google === 'undefined') return;
+
+    if (points.length === 1) {
+      map.setCenter(points[0]);
+      map.setZoom(13);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    points.forEach((point) => bounds.extend(point));
+    map.fitBounds(bounds, 72);
+  }, [map, points]);
+
+  return null;
 }
 
 export default function OperationsPage() {
@@ -125,9 +150,11 @@ export default function OperationsPage() {
     if (!executions?.length) return;
 
     setLiveLocations((prev) => {
-      const next = { ...prev };
+      const next: Record<string, DriverLocation> = {};
 
       executions.forEach((execution) => {
+        const existingLocation = execution.driverId?._id ? prev[execution.driverId._id] : undefined;
+
         if (
           execution.driverId?._id &&
           typeof execution.driverId.currentLocation?.lat === 'number' &&
@@ -140,6 +167,8 @@ export default function OperationsPage() {
             lng: execution.driverId.currentLocation.lng,
             timestamp: execution.driverId.currentLocation.updatedAt,
           };
+        } else if (existingLocation) {
+          next[execution.driverId._id] = existingLocation;
         }
       });
 
@@ -150,7 +179,10 @@ export default function OperationsPage() {
   const totalExecutions = executions?.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalExecutions / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paginatedExecutions = executions?.slice((safePage - 1) * pageSize, safePage * pageSize) ?? [];
+  const paginatedExecutions = useMemo(
+    () => executions?.slice((safePage - 1) * pageSize, safePage * pageSize) ?? [],
+    [executions, pageSize, safePage]
+  );
 
   useEffect(() => {
     if (page !== safePage) {
@@ -174,12 +206,23 @@ export default function OperationsPage() {
   const selectedDriverLocation = selectedExecution?.driverId?._id
     ? liveLocations[selectedExecution.driverId._id]
     : undefined;
+  const selectedDriverFreshness = getLocationFreshnessState(selectedDriverLocation?.timestamp);
   const allLiveLocations = useMemo(() => Object.values(liveLocations), [liveLocations]);
-  const routePath =
-    selectedExecution?.stops.map((stop) => ({
-      lat: stop.location.lat,
-      lng: stop.location.lng,
-    })) ?? [];
+  const routePath = useMemo(
+    () =>
+      selectedExecution?.stops.map((stop) => ({
+        lat: stop.location.lat,
+        lng: stop.location.lng,
+      })) ?? [],
+    [selectedExecution?.stops]
+  );
+  const visiblePoints = useMemo(
+    () => [
+      ...allLiveLocations.map((location) => ({ lat: location.lat, lng: location.lng })),
+      ...routePath,
+    ],
+    [allLiveLocations, routePath]
+  );
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -261,11 +304,17 @@ export default function OperationsPage() {
                     : ''}
                 </p>
                 {selectedDriverLocation?.timestamp ? (
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    {tDashboard('lastUpdated', {
-                      value: formatDateTime(selectedDriverLocation.timestamp, locale),
-                    })}
-                  </p>
+                  <div className="mt-1 flex items-center gap-2 text-[11px]">
+                    <span className={`h-2 w-2 rounded-full ${selectedDriverFreshness.dotClassName}`} />
+                    <span className={selectedDriverFreshness.textClassName}>
+                      {tDashboard(selectedDriverFreshness.labelKey)}
+                    </span>
+                    <span className="text-gray-400">
+                      {tDashboard('lastUpdated', {
+                        value: formatDateTime(selectedDriverLocation.timestamp, locale),
+                      })}
+                    </span>
+                  </div>
                 ) : null}
               </div>
               <Link
@@ -336,6 +385,7 @@ export default function OperationsPage() {
             gestureHandling="greedy"
             className="w-full h-full"
           >
+            <OperationsMapAutoFit points={visiblePoints} />
             {/* All live drivers */}
             {allLiveLocations.map((loc) => (
               <AdvancedMarker

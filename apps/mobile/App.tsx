@@ -18,11 +18,16 @@ import { useLocaleStore } from './src/stores/localeStore';
 import {
   apiClient,
   clearAuthSession,
+  getStoredUser,
   getStoredAuthSession,
+  isDefinitiveAuthFailure,
   registerAuthFailureHandler,
+  persistStoredUser,
+  type StoredAuthUser,
 } from './src/services/api';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { useDriverRealtime } from './src/hooks/useDriverRealtime';
+import { useActiveExecutionTracking } from './src/hooks/useActiveExecutionTracking';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,6 +65,31 @@ interface CompletionContext {
   }>;
 }
 
+function normalizeUser(raw: {
+  _id?: string;
+  id?: string;
+  email: string;
+  role: string;
+  locale?: string;
+  companyId?: string;
+  driverId?: string;
+}): StoredAuthUser {
+  return {
+    id: raw.id ?? raw._id ?? '',
+    email: raw.email,
+    role: raw.role,
+    locale: raw.locale,
+    companyId:
+      typeof raw.companyId === 'object' && raw.companyId !== null
+        ? (raw.companyId as { _id: string })._id
+        : raw.companyId,
+    driverId:
+      typeof raw.driverId === 'object' && raw.driverId !== null
+        ? String(raw.driverId)
+        : raw.driverId,
+  };
+}
+
 function AppContent() {
   const { isAuthenticated, setAuth, logout } = useAuthStore();
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -68,6 +98,7 @@ function AppContent() {
   const { isOnline } = useNetworkStatus();
 
   useDriverRealtime();
+  useActiveExecutionTracking();
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -75,7 +106,12 @@ function AppContent() {
         const locale = await initI18n();
         useLocaleStore.setState({ locale });
 
-        const session = await getStoredAuthSession();
+        const [session, storedUser] = await Promise.all([getStoredAuthSession(), getStoredUser()]);
+
+        if (storedUser && session.accessToken) {
+          setAuth(storedUser, session.accessToken, session.refreshToken);
+        }
+
         if (session.accessToken || session.refreshToken) {
           const res = await apiClient.get('/auth/me');
           const raw = res.data.data as {
@@ -88,30 +124,28 @@ function AppContent() {
             driverId?: string;
           };
           const latestSession = await getStoredAuthSession();
+          const normalizedUser = normalizeUser(raw);
 
-          setAuth(
-            {
-              id: raw.id ?? raw._id ?? '',
-              email: raw.email,
-              role: raw.role,
-              locale: raw.locale,
-              companyId:
-                typeof raw.companyId === 'object' && raw.companyId !== null
-                  ? (raw.companyId as { _id: string })._id
-                  : raw.companyId,
-              driverId:
-                typeof raw.driverId === 'object' && raw.driverId !== null
-                  ? String(raw.driverId)
-                  : raw.driverId,
-            },
-            latestSession.accessToken ?? session.accessToken ?? '',
-            latestSession.refreshToken ?? session.refreshToken
-          );
+          await persistStoredUser(normalizedUser);
+          setAuth(normalizedUser, latestSession.accessToken ?? session.accessToken ?? '', latestSession.refreshToken ?? session.refreshToken);
         }
         setBootstrapError(null);
-      } catch {
-        await clearAuthSession();
-        logout();
+      } catch (error) {
+        if (isDefinitiveAuthFailure(error)) {
+          await clearAuthSession();
+          logout();
+        } else {
+          const fallbackSession = await getStoredAuthSession();
+          const fallbackUser = await getStoredUser();
+
+          if (fallbackUser && fallbackSession.accessToken) {
+            setAuth(fallbackUser, fallbackSession.accessToken, fallbackSession.refreshToken);
+            setBootstrapError(null);
+            setBootstrapped(true);
+            return;
+          }
+        }
+
         if (!isOnline) {
           setBootstrapError('offline');
         } else {

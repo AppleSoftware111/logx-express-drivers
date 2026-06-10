@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { resolveApiErrorMessage, SUPPORTED_LOCALES, type SupportedLocale } from '@logx/i18n';
 
-import { apiClient, persistAuthSession } from '../services/api';
+import { apiClient, persistAuthSession, persistStoredUser } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import { useLocaleStore } from '../stores/localeStore';
 
@@ -48,6 +48,7 @@ export function LoginScreen({ onLogin }: Props) {
       const { accessToken, refreshToken, user } = res.data.data;
 
       await persistAuthSession(accessToken, refreshToken);
+      await persistStoredUser(user);
       setAuth(user, accessToken, refreshToken);
       onLogin();
     } catch (err) {

@@ -34,6 +34,9 @@
   "STOP_MUST_BE_ARRIVED": "La parada debe estar en LLEGÓ antes de iniciar",
   "STOP_MUST_BE_ARRIVED_OR_IN_PROGRESS": "La parada debe estar LLEGÓ o EN CURSO para completar",
   "POD_FILE_REQUIRED": "Envíe al menos un archivo (foto o firma)",
+  "POD_FILE_TOO_LARGE": "La foto del comprobante es demasiado grande. El tamaño máximo es {maxSizeMb} MB.",
+  "POD_FILE_INVALID_TYPE": "El formato de la foto del comprobante no es compatible. Use JPG, PNG o WEBP.",
+  "POD_UPLOAD_FAILED": "No se pudo cargar la foto del comprobante. Inténtelo de nuevo.",
   "POD_KEY_REQUIRED": "El parámetro key es obligatorio",
   "INTERNAL_ERROR": "Error interno del servidor"
 }

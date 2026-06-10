@@ -161,7 +161,7 @@ export async function getExecution(companyId: string, executionId: string) {
     .select('-__v')
     .populate('routeId', 'name scheduledTime description')
     .populate('contractId', 'clientId slaMinutes')
-    .populate('driverId', 'name phone vehicleId')
+    .populate('driverId', 'name phone vehicleId isOnline currentLocation')
     .populate('originalDriverId', 'name')
     .populate('stops.clientId', 'name address location type')
     .lean();
@@ -526,8 +526,16 @@ export async function savePodToStop(
   if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
   ensureExecutionActorAccess(execution, actor);
 
+  if (execution.status === 'CANCELLED') {
+    throw new AppError(ApiErrorCode.FORBIDDEN, 403);
+  }
+
   const stop = execution.stops.id(stopId);
   if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
+
+  if (!['ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(stop.status)) {
+    throw new AppError(ApiErrorCode.STOP_MUST_BE_ARRIVED_OR_IN_PROGRESS, 400);
+  }
 
   if (photoKey) stop.podPhoto = photoKey;
   if (signatureKey) stop.podSignature = signatureKey;

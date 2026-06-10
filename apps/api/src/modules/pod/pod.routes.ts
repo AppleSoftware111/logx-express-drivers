@@ -32,6 +32,15 @@ router.post(
       throw new AppError(ApiErrorCode.POD_FILE_REQUIRED, 400);
     }
 
+    console.info('[pod-upload] received upload request', {
+      executionId: req.params.executionId,
+      stopId: req.params.stopId,
+      hasPhoto: Boolean(photoFile),
+      hasSignature: Boolean(signatureFile),
+      actorRole: req.user?.role,
+      actorDriverId: req.user?.driverId,
+    });
+
     let photoKey: string | undefined;
     let signatureKey: string | undefined;
 
@@ -56,7 +65,8 @@ router.post(
       req.params.executionId,
       req.params.stopId,
       photoKey,
-      signatureKey
+      signatureKey,
+      req.user
     );
 
     return sendSuccess(res, stop);

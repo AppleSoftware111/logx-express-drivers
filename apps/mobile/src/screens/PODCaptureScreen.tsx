@@ -16,9 +16,13 @@ import * as FileSystem from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { apiClient } from '../services/api';
+import { POD_MAX_FILE_SIZE_BYTES } from '@logx/shared';
+import { resolveApiErrorMessage } from '@logx/i18n';
+
+import { apiClient, UPLOAD_REQUEST_TIMEOUT_MS } from '../services/api';
 import { getCurrentLocation } from '../services/gpsService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useLocaleStore } from '../stores/localeStore';
 
 const getPodDraftKey = (executionId: string, stopId: string) => `podDraft:${executionId}:${stopId}`;
 
@@ -31,6 +35,7 @@ interface Props {
 
 export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: Props) {
   const { t } = useTranslation();
+  const { locale } = useLocaleStore();
   const { isOnline } = useNetworkStatus();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
@@ -88,6 +93,24 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
     }
   };
 
+  const getPodSubmitErrorMessage = (err: unknown) => {
+    const error = err as {
+      code?: string;
+      message?: string;
+      response?: { data?: { error?: { code?: string; message?: string } } };
+    };
+
+    if (error.response?.data) {
+      return resolveApiErrorMessage(error.response.data, locale);
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      return t('mobile.podUploadTimeout');
+    }
+
+    return t('mobile.podSubmitFailed');
+  };
+
   const handleSubmit = async () => {
     if (!isOnline) {
       Alert.alert(t('common.errorTitle'), t('mobile.offlinePodSubmit'));
@@ -101,26 +124,50 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
 
     setSubmitting(true);
     try {
-      const formData = new FormData();
-
       if (photoUri) {
         const fileInfo = await FileSystem.getInfoAsync(photoUri);
-        if (fileInfo.exists) {
-          formData.append('photo', {
-            uri: photoUri,
-            type: 'image/jpeg',
-            name: 'pod-photo.jpg',
-          } as unknown as Blob);
+        if (!fileInfo.exists) {
+          throw new Error('POD photo no longer exists on disk');
         }
-      }
 
-      if (receiverName) formData.append('receiverName', receiverName);
-      if (notes) formData.append('deliveryNotes', notes);
+        if (
+          'size' in fileInfo &&
+          typeof fileInfo.size === 'number' &&
+          fileInfo.size > POD_MAX_FILE_SIZE_BYTES
+        ) {
+          Alert.alert(
+            t('common.errorTitle'),
+            t('mobile.podPhotoTooLarge', {
+              maxSizeMb: Math.round(POD_MAX_FILE_SIZE_BYTES / (1024 * 1024)),
+            })
+          );
+          return;
+        }
 
-      if (photoUri) {
+        const formData = new FormData();
+        formData.append('photo', {
+          uri: photoUri,
+          type: 'image/jpeg',
+          name: 'pod-photo.jpg',
+        } as unknown as Blob);
+
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.log('[pod-upload] uploading photo', {
+            executionId,
+            stopId,
+            size: 'size' in fileInfo ? fileInfo.size : undefined,
+          });
+        }
+
         await apiClient.post(`/pod/${executionId}/stops/${stopId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: UPLOAD_REQUEST_TIMEOUT_MS,
         });
+
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.log('[pod-upload] photo upload complete', { executionId, stopId });
+        }
       }
 
       // Complete the stop
@@ -138,7 +185,11 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
         { text: 'OK', onPress: onSuccess },
       ]);
     } catch (err) {
-      Alert.alert(t('common.errorTitle'), t('mobile.podSubmitFailed'));
+      if (__DEV__) {
+        console.warn('[pod-submit] failed', err);
+      }
+
+      Alert.alert(t('common.errorTitle'), getPodSubmitErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

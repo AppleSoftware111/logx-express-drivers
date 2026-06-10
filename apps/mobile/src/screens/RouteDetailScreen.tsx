@@ -20,9 +20,8 @@ import {
 
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
-import { useGpsTracking } from '../hooks/useGpsTracking';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { getTrackedExecutionId } from '../services/gpsService';
+import { activateTrackedExecution, getTrackedExecutionId, stopBackgroundGps } from '../services/gpsService';
 import { StopDetailScreen } from './StopDetailScreen';
 import { PODCaptureScreen } from './PODCaptureScreen';
 
@@ -85,9 +84,6 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     refetchOnReconnect: true,
   });
 
-  // GPS tracking
-  useGpsTracking(executionId, isTracking);
-
   useEffect(() => {
     void (async () => {
       const trackedExecutionId = await getTrackedExecutionId();
@@ -104,6 +100,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
 
     if (['COMPLETED', 'CANCELLED'].includes(execution?.status ?? '')) {
       setIsTracking(false);
+      void stopBackgroundGps();
     }
   }, [execution?.status]);
 
@@ -114,6 +111,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     onSuccess: () => {
       setIsTracking(true);
       setGpsWarning(null);
+      void activateTrackedExecution(executionId);
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
       void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
     },

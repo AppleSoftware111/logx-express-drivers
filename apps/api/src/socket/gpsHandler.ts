@@ -5,7 +5,7 @@ import { SOCKET_EVENTS, SOCKET_ROOMS } from '@logx/shared';
 
 import { Driver } from '../models/Driver.model';
 import { User } from '../models/User.model';
-import { checkGeofenceArrivals, bufferGpsPoint, updateDriverLocation } from '../modules/tracking/tracking.service';
+import { processDriverGpsPayload, updateDriverLocation } from '../modules/tracking/tracking.service';
 import { emitDriverLocationUpdate, emitExecutionRealtimeUpdate } from './realtime';
 
 export function registerGpsHandlers(io: Server, socket: Socket): void {
@@ -30,11 +30,8 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
       if (!driverId) return;
 
       try {
-        // Buffer point for bulk DB insert (include companyId for multi-tenant safety)
-        bufferGpsPoint({
-          driverId,
+        const arrival = await processDriverGpsPayload(companyId, driverId, {
           executionId: payload.executionId,
-          companyId,
           lat: payload.lat,
           lng: payload.lng,
           speed: payload.speed,
@@ -42,9 +39,6 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
           accuracy: payload.accuracy,
           recordedAt: payload.recordedAt ?? new Date().toISOString(),
         });
-
-        // Update driver's latest position in DB
-        await updateDriverLocation(driverId, payload.lat, payload.lng);
 
         emitDriverLocationUpdate(companyId, {
           driverId,
@@ -56,14 +50,6 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
           accuracy: payload.accuracy,
           timestamp: payload.recordedAt ?? new Date().toISOString(),
         });
-
-        // Check geofence for auto-arrival
-        const arrival = await checkGeofenceArrivals(
-          payload.executionId,
-          companyId,
-          payload.lat,
-          payload.lng
-        );
 
         if (arrival) {
           const user = userId

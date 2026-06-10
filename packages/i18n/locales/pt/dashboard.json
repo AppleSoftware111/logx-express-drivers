@@ -19,6 +19,7 @@
   "liveNow": "Ao vivo agora",
   "updatedRecently": "Atualizado recentemente",
   "staleLocation": "Localização desatualizada",
+  "offlineLocation": "Rastreamento offline",
   "locationUnknown": "Aguardando localização",
   "lastUpdated": "Atualizado: {value}",
   "recentAlerts": "Alertas recentes",

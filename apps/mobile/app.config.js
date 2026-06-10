@@ -5,7 +5,19 @@ const buildProfile = process.env.EAS_BUILD_PROFILE ?? process.env.APP_VARIANT ??
 const isProductionProfile = buildProfile === 'production';
 const fallbackApiUrl = isProductionProfile ? undefined : 'http://10.0.2.2:4000';
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? appJson.expo.extra?.apiUrl ?? fallbackApiUrl;
-const versionCode = Number.parseInt(process.env.ANDROID_VERSION_CODE ?? '1', 10);
+
+function deriveVersionCode(appVersion) {
+  const [major = '1', minor = '0', patch = '0'] = String(appVersion).split('.');
+  const safeMajor = Number.parseInt(major, 10) || 1;
+  const safeMinor = Number.parseInt(minor, 10) || 0;
+  const safePatch = Number.parseInt(patch, 10) || 0;
+  return safeMajor * 10000 + safeMinor * 100 + safePatch;
+}
+
+const versionCode = Number.parseInt(
+  process.env.ANDROID_VERSION_CODE ?? String(deriveVersionCode(appJson.expo.version)),
+  10
+);
 
 if (!API_URL) {
   throw new Error(

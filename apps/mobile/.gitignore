@@ -9,6 +9,7 @@ ios/
 
 # Env & secrets
 .env
+credentials.json
 *.jks
 *.keystore
 google-services.json

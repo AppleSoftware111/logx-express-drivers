@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { useAuthStore } from '../stores/authStore';
-import { getCurrentLocation } from '../services/gpsService';
+import { flushQueuedGpsPayloads, getCurrentLocation } from '../services/gpsService';
 import { useSocketStore } from '../stores/socketStore';
 
 type DriverRouteRealtimePayload = {
@@ -65,6 +65,7 @@ export function useDriverRealtime() {
 
     const handleConnect = () => {
       socket.emit(SOCKET_EVENTS.DRIVER_ONLINE);
+      void flushQueuedGpsPayloads();
       void emitPresenceLocation();
       invalidateExecutionState();
     };
@@ -88,6 +89,7 @@ export function useDriverRealtime() {
       if (!socket.connected) {
         socket.connect();
       } else {
+        void flushQueuedGpsPayloads();
         void emitPresenceLocation();
       }
 

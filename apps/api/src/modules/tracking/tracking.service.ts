@@ -1,5 +1,8 @@
 import type { GpsPointInput } from '@logx/shared';
-import { GEOFENCE_RADIUS_METERS } from '@logx/shared';
+import {
+  DRIVER_LOCATION_STALE_WINDOW_MS,
+  GEOFENCE_RADIUS_METERS,
+} from '@logx/shared';
 
 import { Client } from '../../models/Client.model';
 import { Driver } from '../../models/Driver.model';
@@ -63,6 +66,28 @@ export async function updateDriverLocation(
   });
 }
 
+export async function processDriverGpsPayload(
+  companyId: string,
+  driverId: string,
+  payload: Omit<GpsPointInput, 'driverId'>
+): Promise<{ executionId: string; stopId: string; clientName: string } | null> {
+  bufferGpsPoint({
+    driverId,
+    executionId: payload.executionId,
+    companyId,
+    lat: payload.lat,
+    lng: payload.lng,
+    speed: payload.speed,
+    heading: payload.heading,
+    accuracy: payload.accuracy,
+    recordedAt: payload.recordedAt,
+  });
+
+  await updateDriverLocation(driverId, payload.lat, payload.lng);
+
+  return checkGeofenceArrivals(payload.executionId, companyId, payload.lat, payload.lng);
+}
+
 /**
  * Check if the driver is within GEOFENCE_RADIUS_METERS of any pending stops.
  * If so, auto-set the stop to ARRIVED.
@@ -119,7 +144,16 @@ export async function checkGeofenceArrivals(
 }
 
 export async function getOnlineDrivers(companyId: string) {
-  return Driver.find({ companyId, isOnline: true, isActive: true })
+  const staleCutoff = new Date(Date.now() - DRIVER_LOCATION_STALE_WINDOW_MS);
+
+  return Driver.find({
+    companyId,
+    isActive: true,
+    $or: [
+      { isOnline: true },
+      { 'currentLocation.updatedAt': { $gte: staleCutoff } },
+    ],
+  })
     .select('name currentLocation vehicleId')
     .populate('vehicleId', 'plate type')
     .lean();

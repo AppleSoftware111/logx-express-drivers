@@ -32,8 +32,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const newSocket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
-      reconnectionAttempts: 8,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1500,
+      reconnectionDelayMax: 10_000,
       autoConnect: true,
     });
 

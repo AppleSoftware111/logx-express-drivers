@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { MulterError } from 'multer';
 import { ZodError } from 'zod';
 
 import {
@@ -7,6 +8,7 @@ import {
   translateValidationKey,
   type SupportedLocale,
 } from '@logx/i18n';
+import { POD_MAX_FILE_SIZE_BYTES } from '@logx/shared';
 
 import { env } from '../config/env';
 import { sendError } from '../utils/apiResponse';
@@ -76,6 +78,28 @@ export function errorHandler(
         message: getApiErrorMessage(err.code, locale, err.params),
       },
       err.statusCode
+    );
+    return;
+  }
+
+  if (err instanceof MulterError) {
+    const statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    const code =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? ApiErrorCode.POD_FILE_TOO_LARGE
+        : ApiErrorCode.VALIDATION_ERROR;
+    const params =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? { maxSizeMb: Math.round(POD_MAX_FILE_SIZE_BYTES / (1024 * 1024)) }
+        : undefined;
+
+    sendError(
+      res,
+      {
+        code,
+        message: getApiErrorMessage(code, locale, params),
+      },
+      statusCode
     );
     return;
   }
