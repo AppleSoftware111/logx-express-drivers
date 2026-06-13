@@ -25,6 +25,13 @@ export interface GpsPayload {
   recordedAt: string;
 }
 
+export interface GpsReadiness {
+  servicesEnabled: boolean;
+  foregroundGranted: boolean;
+  backgroundGranted: boolean;
+  ready: boolean;
+}
+
 let currentExecutionId: string | null = null;
 
 async function readQueuedGpsPayloads(): Promise<GpsPayload[]> {
@@ -179,6 +186,49 @@ export async function requestLocationPermissions(): Promise<boolean> {
 
   const { status: background } = await Location.requestBackgroundPermissionsAsync();
   return background === 'granted';
+}
+
+export async function checkGpsReadiness(): Promise<GpsReadiness> {
+  const [servicesEnabled, foreground, background] = await Promise.all([
+    Location.hasServicesEnabledAsync(),
+    Location.getForegroundPermissionsAsync(),
+    Location.getBackgroundPermissionsAsync(),
+  ]);
+
+  const foregroundGranted = foreground.status === 'granted';
+  const backgroundGranted = background.status === 'granted';
+
+  return {
+    servicesEnabled,
+    foregroundGranted,
+    backgroundGranted,
+    ready: servicesEnabled && foregroundGranted && backgroundGranted,
+  };
+}
+
+export async function requestRequiredLocationPermissions(): Promise<GpsReadiness> {
+  const servicesEnabled = await Location.hasServicesEnabledAsync();
+  const foreground = await Location.requestForegroundPermissionsAsync();
+  const background =
+    foreground.status === 'granted'
+      ? await Location.requestBackgroundPermissionsAsync()
+      : await Location.getBackgroundPermissionsAsync();
+
+  const foregroundGranted = foreground.status === 'granted';
+  const backgroundGranted = background.status === 'granted';
+
+  return {
+    servicesEnabled,
+    foregroundGranted,
+    backgroundGranted,
+    ready: servicesEnabled && foregroundGranted && backgroundGranted,
+  };
+}
+
+export async function ensureGpsReadyForRouteStart(): Promise<GpsReadiness> {
+  const current = await checkGpsReadiness();
+  if (current.ready) return current;
+  return requestRequiredLocationPermissions();
 }
 
 export async function startBackgroundGps(executionId: string): Promise<boolean> {

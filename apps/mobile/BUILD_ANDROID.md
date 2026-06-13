@@ -197,6 +197,55 @@ Run this before sending an APK to the client:
 
 ---
 
+## Final APK scope freeze
+
+After the route collection workflow is tested and approved, the driver APK is considered feature-complete for operations.
+
+Included final operational scope:
+
+- Route Received confirmation
+- On the Way, Arrived, and Collected workflow for every stop
+- Route Completed confirmation
+- continuous background GPS while the route is active
+- lock-screen/background tracking with Android foreground service notification
+- offline recording and automatic sync for route workflow events
+- GPS evidence for arrival and collection actions
+- distance-to-stop audit evidence
+- optional collection photo, signature, and notes
+- admin audit timeline for route/stop proof
+
+Allowed after scope freeze:
+
+- critical bug fixes
+- security fixes
+- performance improvements
+- compatibility fixes for supported Android devices
+
+Not allowed after scope freeze unless approved as a separate project:
+
+- new route lifecycle states
+- new collection workflow features
+- new operational modules
+- new driver app feature requests outside the approved workflow
+
+## Route collection acceptance checklist
+
+Run these checks on real Android hardware before giving an APK to the client:
+
+1. Driver receives route and taps **Route Received**.
+2. Backend/admin audit stores timestamp, user/driver ID, and route/execution ID.
+3. Driver taps **On the Way** for stop 1 and GPS tracking starts.
+4. Driver locks the phone for at least 5 minutes; admin maps continue showing live/recent location.
+5. Driver taps **Arrived** and audit stores timestamp, GPS coordinates, and distance to expected stop.
+6. Driver taps **Collected** with a photo and notes; proof and GPS evidence sync.
+7. Device goes offline between stops; actions are saved locally and sync after reconnect.
+8. Workflow repeats for all stops.
+9. Driver taps **Route Completed** and tracking stops.
+10. Admin execution detail shows the full audit timeline and proof trail.
+11. Driver does not need to log in again after locking/unlocking the phone.
+
+---
+
 ## Version bumps
 
 - App version: `app.json` → `expo.version`

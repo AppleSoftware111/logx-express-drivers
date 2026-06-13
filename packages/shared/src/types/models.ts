@@ -113,6 +113,7 @@ export interface ExecutionStopDto {
   expectedDurationMinutes: number;
   type: RouteStopType;
   status: StopStatus;
+  onTheWayAt?: string;
   arrivedAt?: string;
   startedAt?: string;
   completedAt?: string;
@@ -122,6 +123,11 @@ export interface ExecutionStopDto {
   receiverName?: string;
   deliveryNotes?: string;
   deliveryLocation?: { lat: number; lng: number };
+  arrivalLocation?: { lat: number; lng: number };
+  arrivalAddress?: string;
+  arrivalDistanceMeters?: number;
+  collectionAddress?: string;
+  collectionDistanceMeters?: number;
   instructions?: string;
 }
 
@@ -150,6 +156,43 @@ export interface GpsPointDto {
   heading?: number;
   accuracy?: number;
   recordedAt: string;
+}
+
+export interface RouteExecutionAuditDto extends BaseModel {
+  companyId: string;
+  routeId: string;
+  executionId: string;
+  stopId?: string;
+  action:
+    | 'ROUTE_RECEIVED'
+    | 'STOP_ON_THE_WAY'
+    | 'STOP_ARRIVED'
+    | 'STOP_COLLECTED'
+    | 'ROUTE_COMPLETED'
+    | 'STOP_SKIPPED';
+  actorUserId?: UserDto | string;
+  driverId: DriverDto | string;
+  clientEventId: string;
+  occurredAt: string;
+  serverReceivedAt: string;
+  syncedAt?: string;
+  source: 'mobile_online' | 'mobile_offline_sync' | 'geofence' | 'admin';
+  gps?: {
+    lat: number;
+    lng: number;
+    speed?: number;
+    heading?: number;
+    accuracy?: number;
+    recordedAt?: string;
+  };
+  expectedLocation?: { lat: number; lng: number };
+  distanceMeters?: number;
+  resolvedAddress?: string;
+  notes?: string;
+  receiverName?: string;
+  photoKey?: string;
+  signatureKey?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AlertDto extends BaseModel {

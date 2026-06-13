@@ -38,6 +38,7 @@
   },
   "stopStatus": {
     "PENDING": "Pending",
+    "ON_THE_WAY": "On the way",
     "ARRIVED": "Arrived",
     "IN_PROGRESS": "In progress",
     "COMPLETED": "Completed",

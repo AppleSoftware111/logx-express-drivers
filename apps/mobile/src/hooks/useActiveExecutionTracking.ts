@@ -11,6 +11,7 @@ import {
   hasBackgroundGpsStarted,
   stopBackgroundGps,
 } from '../services/gpsService';
+import { flushWorkflowOutbox } from '../services/routeWorkflowService';
 import { useAuthStore } from '../stores/authStore';
 import { useSocketStore } from '../stores/socketStore';
 
@@ -76,6 +77,7 @@ export function useActiveExecutionTracking() {
 
     const flushQueue = async () => {
       await flushQueuedGpsPayloads();
+      await flushWorkflowOutbox();
     };
 
     const handleAppStateChange = (nextState: string) => {

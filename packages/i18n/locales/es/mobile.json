@@ -5,6 +5,8 @@
   "routeDetail": "Detalles de la ruta",
   "stops": "Paradas",
   "startRoute": "Iniciar ruta",
+  "routeReceived": "Ruta recibida",
+  "routeReceivedAction": "Ruta recibida",
   "completeRoute": "Completar ruta",
   "stopDetail": "Parada",
   "capturePod": "Capturar comprobante",
@@ -38,6 +40,8 @@
   "actions": "Acciones",
   "navigate": "Navegar",
   "markArrived": "Marcar llegada",
+  "onTheWay": "En camino",
+  "collected": "Recogido",
   "startDelivery": "Iniciar entrega",
   "startPickup": "Iniciar recogida",
   "completeCapturePod": "Completar y capturar comprobante",
@@ -79,5 +83,7 @@
   "skipReasonDefault": "Omitida desde la app móvil",
   "offlineStopAction": "Necesita conexión a internet para actualizar esta parada.",
   "offlinePodSubmit": "La prueba de entrega quedó guardada localmente, pero el envío requiere internet.",
-  "podValidation": "Agregue el nombre del receptor o capture una foto antes de completar la parada."
+  "podValidation": "Agregue el nombre del receptor o capture una foto antes de completar la parada.",
+  "actionQueuedForSync": "Guardado en este dispositivo. Se sincronizará automáticamente cuando haya conexión disponible.",
+  "gpsRequiredToStart": "Active el GPS y conceda permisos de ubicación en primer plano y en segundo plano antes de iniciar el seguimiento de la ruta."
 }

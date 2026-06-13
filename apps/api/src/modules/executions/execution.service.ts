@@ -2,6 +2,8 @@ import type {
   CompleteStopInput,
   SubstituteDriverInput,
   UpdateExecutionStatusInput,
+  WorkflowActionInput,
+  WorkflowSyncEventInput,
 } from '@logx/shared';
 
 import { ApiErrorCode } from '@logx/i18n';
@@ -11,10 +13,12 @@ import { Alert } from '../../models/Alert.model';
 import { GpsPoint } from '../../models/GpsPoint.model';
 import { Route } from '../../models/Route.model';
 import { RouteExecution, type IRouteExecution } from '../../models/RouteExecution.model';
+import { RouteExecutionAudit, type RouteExecutionAuditAction } from '../../models/RouteExecutionAudit.model';
 import { SOCKET_EVENTS } from '@logx/shared';
 import { localizeAlertDocument } from '../alerts/alert.service';
 import { invalidateCache } from '../../utils/cache';
 import { emitExecutionRealtimeUpdate } from '../../socket/realtime';
+import { haversineDistance } from '../../utils/haversine';
 import {
   businessDateStringToUtcDate,
   calcDelayMinutes,
@@ -25,9 +29,12 @@ import {
 } from '../../utils/timeCalc';
 
 type ExecutionActor = {
+  userId?: string;
   role: string;
   driverId?: string;
 };
+
+type WorkflowSource = 'mobile_online' | 'mobile_offline_sync' | 'geofence' | 'admin';
 
 export function touchDashboard(companyId: string) {
   void invalidateCache(`dashboard:summary:${companyId}:*`);
@@ -46,7 +53,7 @@ export function syncExecutionLifecycle(execution: IRouteExecution) {
 
   if (hasStarted && !execution.actualStartTime) {
     const firstActivity = relevantStops
-      .flatMap((stop) => [stop.arrivedAt, stop.startedAt, stop.completedAt])
+      .flatMap((stop) => [stop.onTheWayAt, stop.arrivedAt, stop.startedAt, stop.completedAt])
       .find((timestamp): timestamp is Date => timestamp instanceof Date);
     execution.actualStartTime = firstActivity ?? new Date();
   }
@@ -63,7 +70,7 @@ export function syncExecutionLifecycle(execution: IRouteExecution) {
     execution.status = 'COMPLETED';
     if (!execution.actualEndTime) {
       const latestStopTime = execution.stops
-        .flatMap((stop) => [stop.completedAt, stop.startedAt, stop.arrivedAt])
+        .flatMap((stop) => [stop.completedAt, stop.startedAt, stop.arrivedAt, stop.onTheWayAt])
         .filter((timestamp): timestamp is Date => timestamp instanceof Date)
         .sort((left, right) => right.getTime() - left.getTime())[0];
       execution.actualEndTime = latestStopTime ?? new Date();
@@ -90,6 +97,133 @@ function ensureExecutionActorAccess(
   if (!actor.driverId || !assignedDriverId || actor.driverId !== assignedDriverId) {
     throw new AppError(ApiErrorCode.FORBIDDEN, 403);
   }
+}
+
+function getOccurredAt(input?: WorkflowActionInput): Date {
+  const parsed = input?.occurredAt ? new Date(input.occurredAt) : new Date();
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function getGpsRecordedAt(input?: WorkflowActionInput): Date | undefined {
+  if (!input?.gps?.recordedAt) return undefined;
+  const parsed = new Date(input.gps.recordedAt);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function buildClientEventId(
+  action: RouteExecutionAuditAction,
+  executionId: string,
+  stopId: string | undefined,
+  input?: WorkflowActionInput
+): string {
+  return input?.clientEventId ?? `${action}:${executionId}:${stopId ?? 'route'}:${getOccurredAt(input).toISOString()}`;
+}
+
+function getDistanceMeters(
+  stop: { location?: { lat: number; lng: number } } | null | undefined,
+  input?: WorkflowActionInput
+): number | undefined {
+  if (!stop?.location || !input?.gps) return undefined;
+  return Math.round(
+    haversineDistance(
+      input.gps.lat,
+      input.gps.lng,
+      stop.location.lat,
+      stop.location.lng
+    )
+  );
+}
+
+async function findExistingWorkflowAudit(companyId: string, clientEventId: string) {
+  return RouteExecutionAudit.findOne({ companyId, clientEventId }).lean();
+}
+
+async function recordWorkflowAudit({
+  companyId,
+  execution,
+  stopId,
+  action,
+  input,
+  actor,
+  source,
+}: {
+  companyId: string;
+  execution: IRouteExecution;
+  stopId?: string;
+  action: RouteExecutionAuditAction;
+  input?: WorkflowActionInput;
+  actor?: ExecutionActor;
+  source: WorkflowSource;
+}) {
+  const clientEventId = buildClientEventId(action, String(execution._id), stopId, input);
+  const existing = await findExistingWorkflowAudit(companyId, clientEventId);
+  if (existing) return existing;
+
+  const stop = stopId ? execution.stops.id(stopId) : null;
+  const distanceMeters = getDistanceMeters(stop, input);
+
+  return RouteExecutionAudit.create({
+    companyId,
+    routeId: execution.routeId,
+    executionId: execution._id,
+    stopId,
+    action,
+    actorUserId: actor?.userId,
+    driverId: execution.driverId,
+    clientEventId,
+    occurredAt: getOccurredAt(input),
+    serverReceivedAt: new Date(),
+    syncedAt: source === 'mobile_offline_sync' ? new Date() : undefined,
+    source,
+    gps: input?.gps
+      ? {
+          lat: input.gps.lat,
+          lng: input.gps.lng,
+          speed: input.gps.speed,
+          heading: input.gps.heading,
+          accuracy: input.gps.accuracy,
+          recordedAt: getGpsRecordedAt(input),
+        }
+      : undefined,
+    expectedLocation: stop?.location
+      ? {
+          lat: stop.location.lat,
+          lng: stop.location.lng,
+        }
+      : undefined,
+    distanceMeters,
+    resolvedAddress: input?.resolvedAddress,
+    notes: input?.notes,
+    receiverName: input?.receiverName,
+    photoKey: input?.photoKey,
+    signatureKey: input?.signatureKey,
+    metadata: input?.metadata,
+  });
+}
+
+function emitWorkflowUpdate(
+  companyId: string,
+  execution: IRouteExecution,
+  event: Parameters<typeof emitExecutionRealtimeUpdate>[1]['event'],
+  stopId?: string
+) {
+  emitExecutionRealtimeUpdate(
+    companyId,
+    {
+      event,
+      executionId: String(execution._id),
+      routeId: String(execution.routeId),
+      driverId: String(execution.driverId),
+      status: execution.status,
+      stopId,
+      scheduledTime: execution.scheduledTime,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      driverEvent: SOCKET_EVENTS.DRIVER_ROUTE_UPDATED,
+      driverIds: [String(execution.driverId)],
+    }
+  );
 }
 
 export async function listExecutions(
@@ -167,6 +301,289 @@ export async function getExecution(companyId: string, executionId: string) {
     .lean();
   if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
   return execution;
+}
+
+export async function getExecutionAudits(companyId: string, executionId: string) {
+  return RouteExecutionAudit.find({ companyId, executionId })
+    .select('-__v')
+    .populate('driverId', 'name phone')
+    .populate('actorUserId', 'email role')
+    .lean()
+    .sort({ occurredAt: 1, createdAt: 1 });
+}
+
+export async function receiveRoute(
+  companyId: string,
+  executionId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('ROUTE_RECEIVED', executionId, undefined, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  if (['PENDING', 'ASSIGNED'].includes(execution.status)) {
+    execution.status = 'ACCEPTED';
+  }
+
+  await recordWorkflowAudit({ companyId, execution, action: 'ROUTE_RECEIVED', input, actor, source });
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STATUS_CHANGED');
+  return execution.toObject();
+}
+
+export async function setStopOnTheWay(
+  companyId: string,
+  executionId: string,
+  stopId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('STOP_ON_THE_WAY', executionId, stopId, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  const stop = execution.stops.id(stopId);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
+  if (!['PENDING', 'ON_THE_WAY'].includes(stop.status)) {
+    throw new AppError(ApiErrorCode.STOP_ALREADY_STATUS, 400, { status: stop.status });
+  }
+
+  const occurredAt = getOccurredAt(input);
+  stop.status = 'ON_THE_WAY';
+  stop.onTheWayAt = occurredAt;
+  stop.startedAt = occurredAt;
+  if (['PENDING', 'ASSIGNED', 'ACCEPTED'].includes(execution.status)) {
+    execution.status = 'IN_PROGRESS';
+  }
+  if (!execution.actualStartTime) {
+    execution.actualStartTime = occurredAt;
+  }
+
+  await recordWorkflowAudit({ companyId, execution, stopId, action: 'STOP_ON_THE_WAY', input, actor, source });
+  syncExecutionLifecycle(execution);
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STOP_STARTED', stopId);
+  return execution.toObject();
+}
+
+export async function workflowStopArrived(
+  companyId: string,
+  executionId: string,
+  stopId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('STOP_ARRIVED', executionId, stopId, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  const stop = execution.stops.id(stopId);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
+  if (!['PENDING', 'ON_THE_WAY', 'ARRIVED'].includes(stop.status)) {
+    throw new AppError(ApiErrorCode.STOP_ALREADY_STATUS, 400, { status: stop.status });
+  }
+
+  const occurredAt = getOccurredAt(input);
+  const distanceMeters = getDistanceMeters(stop, input);
+  stop.status = 'ARRIVED';
+  stop.arrivedAt = occurredAt;
+  if (input.gps) stop.arrivalLocation = { lat: input.gps.lat, lng: input.gps.lng };
+  if (input.resolvedAddress) stop.arrivalAddress = input.resolvedAddress;
+  if (distanceMeters !== undefined) stop.arrivalDistanceMeters = distanceMeters;
+
+  await recordWorkflowAudit({ companyId, execution, stopId, action: 'STOP_ARRIVED', input, actor, source });
+  syncExecutionLifecycle(execution);
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STOP_ARRIVED', stopId);
+  return execution.toObject();
+}
+
+export async function workflowStopCollected(
+  companyId: string,
+  executionId: string,
+  stopId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('STOP_COLLECTED', executionId, stopId, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  const stop = execution.stops.id(stopId);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
+  if (!['ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED'].includes(stop.status)) {
+    throw new AppError(ApiErrorCode.STOP_MUST_BE_ARRIVED_OR_IN_PROGRESS, 400);
+  }
+
+  const completedAt = getOccurredAt(input);
+  const distanceMeters = getDistanceMeters(stop, input);
+  stop.status = 'COMPLETED';
+  stop.completedAt = completedAt;
+  if (!stop.arrivedAt && stop.status !== 'ARRIVED') {
+    stop.arrivedAt = completedAt;
+  }
+  if (stop.arrivedAt) {
+    stop.waitingTimeMinutes = calcWaitingMinutes(stop.arrivedAt, completedAt);
+  }
+  if (input.receiverName) stop.receiverName = input.receiverName;
+  if (input.notes) stop.deliveryNotes = input.notes;
+  if (input.photoKey) stop.podPhoto = input.photoKey;
+  if (input.signatureKey) stop.podSignature = input.signatureKey;
+  if (input.gps) stop.deliveryLocation = { lat: input.gps.lat, lng: input.gps.lng };
+  if (input.resolvedAddress) stop.collectionAddress = input.resolvedAddress;
+  if (distanceMeters !== undefined) stop.collectionDistanceMeters = distanceMeters;
+
+  await recordWorkflowAudit({ companyId, execution, stopId, action: 'STOP_COLLECTED', input, actor, source });
+  syncExecutionLifecycle(execution);
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STOP_COMPLETED', stopId);
+  return execution.toObject();
+}
+
+export async function workflowStopSkipped(
+  companyId: string,
+  executionId: string,
+  stopId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('STOP_SKIPPED', executionId, stopId, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  const stop = execution.stops.id(stopId);
+  if (!stop) throw new AppError(ApiErrorCode.STOP_NOT_FOUND, 404);
+
+  stop.status = 'SKIPPED';
+  if (input.notes) stop.deliveryNotes = input.notes;
+
+  await recordWorkflowAudit({ companyId, execution, stopId, action: 'STOP_SKIPPED', input, actor, source });
+  syncExecutionLifecycle(execution);
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STOP_SKIPPED', stopId);
+  return execution.toObject();
+}
+
+export async function workflowRouteCompleted(
+  companyId: string,
+  executionId: string,
+  input: WorkflowActionInput,
+  actor?: ExecutionActor,
+  source: WorkflowSource = 'mobile_online'
+) {
+  const existing = await findExistingWorkflowAudit(
+    companyId,
+    buildClientEventId('ROUTE_COMPLETED', executionId, undefined, input)
+  );
+  if (existing) return getExecution(companyId, executionId);
+
+  const execution = await RouteExecution.findOne({ companyId, _id: executionId });
+  if (!execution) throw new AppError(ApiErrorCode.EXECUTION_NOT_FOUND, 404);
+  ensureExecutionActorAccess(execution, actor);
+
+  const allStopsResolved =
+    execution.stops.length > 0 &&
+    execution.stops.every((stop) => ['COMPLETED', 'SKIPPED'].includes(stop.status));
+  if (!allStopsResolved) {
+    throw new AppError(ApiErrorCode.VALIDATION_ERROR, 400, {
+      reason: 'all_stops_must_be_resolved',
+    });
+  }
+
+  const completedAt = getOccurredAt(input);
+  execution.status = 'COMPLETED';
+  execution.actualEndTime = completedAt;
+  if (execution.actualStartTime) {
+    execution.totalDurationMinutes = Math.max(
+      0,
+      Math.round((completedAt.getTime() - execution.actualStartTime.getTime()) / 60_000)
+    );
+  }
+
+  await recordWorkflowAudit({ companyId, execution, action: 'ROUTE_COMPLETED', input, actor, source });
+  await execution.save();
+  touchDashboard(companyId);
+  emitWorkflowUpdate(companyId, execution, 'STATUS_CHANGED');
+  return execution.toObject();
+}
+
+export async function syncWorkflowEvents(
+  companyId: string,
+  events: WorkflowSyncEventInput[],
+  actor?: ExecutionActor
+) {
+  const results = [];
+
+  for (const event of events) {
+    const input: WorkflowActionInput = {
+      clientEventId: event.clientEventId,
+      occurredAt: event.occurredAt,
+      gps: event.gps,
+      resolvedAddress: event.resolvedAddress,
+      notes: event.notes,
+      receiverName: event.receiverName,
+      photoKey: event.photoKey,
+      signatureKey: event.signatureKey,
+      metadata: event.metadata,
+    };
+
+    if (event.action === 'ROUTE_RECEIVED') {
+      results.push(await receiveRoute(companyId, event.executionId, input, actor, 'mobile_offline_sync'));
+    } else if (event.action === 'STOP_ON_THE_WAY' && event.stopId) {
+      results.push(await setStopOnTheWay(companyId, event.executionId, event.stopId, input, actor, 'mobile_offline_sync'));
+    } else if (event.action === 'STOP_ARRIVED' && event.stopId) {
+      results.push(await workflowStopArrived(companyId, event.executionId, event.stopId, input, actor, 'mobile_offline_sync'));
+    } else if (event.action === 'STOP_COLLECTED' && event.stopId) {
+      results.push(await workflowStopCollected(companyId, event.executionId, event.stopId, input, actor, 'mobile_offline_sync'));
+    } else if (event.action === 'STOP_SKIPPED' && event.stopId) {
+      results.push(await workflowStopSkipped(companyId, event.executionId, event.stopId, input, actor, 'mobile_offline_sync'));
+    } else if (event.action === 'ROUTE_COMPLETED') {
+      results.push(await workflowRouteCompleted(companyId, event.executionId, input, actor, 'mobile_offline_sync'));
+    }
+  }
+
+  return { synced: results.length };
 }
 
 export async function updateExecutionStatus(

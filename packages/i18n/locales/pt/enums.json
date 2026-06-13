@@ -38,6 +38,7 @@
   },
   "stopStatus": {
     "PENDING": "Pendente",
+    "ON_THE_WAY": "A caminho",
     "ARRIVED": "Chegou",
     "IN_PROGRESS": "Em andamento",
     "COMPLETED": "Concluída",

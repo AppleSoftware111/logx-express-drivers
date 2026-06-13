@@ -19,12 +19,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { POD_MAX_FILE_SIZE_BYTES } from '@logx/shared';
 import { resolveApiErrorMessage } from '@logx/i18n';
 
-import { apiClient, UPLOAD_REQUEST_TIMEOUT_MS } from '../services/api';
-import { getCurrentLocation } from '../services/gpsService';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { useLocaleStore } from '../stores/localeStore';
+import { submitOrQueueWorkflowEvent } from '../services/routeWorkflowService';
 
 const getPodDraftKey = (executionId: string, stopId: string) => `podDraft:${executionId}:${stopId}`;
+const getDurablePodPhotoPath = (executionId: string, stopId: string) =>
+  `${FileSystem.documentDirectory}pod-${executionId}-${stopId}-${Date.now()}.jpg`;
 
 interface Props {
   executionId: string;
@@ -88,7 +89,9 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
     if (!cameraRef.current) return;
     const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
     if (photo?.uri) {
-      setPhotoUri(photo.uri);
+      const durableUri = getDurablePodPhotoPath(executionId, stopId);
+      await FileSystem.copyAsync({ from: photo.uri, to: durableUri });
+      setPhotoUri(durableUri);
       setMode('idle');
     }
   };
@@ -112,18 +115,10 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
   };
 
   const handleSubmit = async () => {
-    if (!isOnline) {
-      Alert.alert(t('common.errorTitle'), t('mobile.offlinePodSubmit'));
-      return;
-    }
-
-    if (!photoUri && !receiverName.trim()) {
-      Alert.alert(t('common.errorTitle'), t('mobile.podValidation'));
-      return;
-    }
-
     setSubmitting(true);
     try {
+      const metadata: Record<string, unknown> = {};
+
       if (photoUri) {
         const fileInfo = await FileSystem.getInfoAsync(photoUri);
         if (!fileInfo.exists) {
@@ -144,46 +139,28 @@ export function PODCaptureScreen({ executionId, stopId, onSuccess, onCancel }: P
           return;
         }
 
-        const formData = new FormData();
-        formData.append('photo', {
-          uri: photoUri,
-          type: 'image/jpeg',
-          name: 'pod-photo.jpg',
-        } as unknown as Blob);
-
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.log('[pod-upload] uploading photo', {
-            executionId,
-            stopId,
-            size: 'size' in fileInfo ? fileInfo.size : undefined,
-          });
-        }
-
-        await apiClient.post(`/pod/${executionId}/stops/${stopId}`, formData, {
-          timeout: UPLOAD_REQUEST_TIMEOUT_MS,
-        });
-
-        if (__DEV__) {
-          // eslint-disable-next-line no-console
-          console.log('[pod-upload] photo upload complete', { executionId, stopId });
-        }
+        metadata.localPhotoUri = photoUri;
+        metadata.localPhotoSize = 'size' in fileInfo ? fileInfo.size : undefined;
       }
 
-      // Complete the stop
-      const currentLocation = await getCurrentLocation();
-      await apiClient.post(`/executions/${executionId}/stops/${stopId}/complete`, {
+      const result = await submitOrQueueWorkflowEvent({
+        action: 'STOP_COLLECTED',
+        executionId,
+        stopId,
         receiverName,
-        deliveryNotes: notes,
-        deliveryLat: currentLocation?.coords.latitude,
-        deliveryLng: currentLocation?.coords.longitude,
+        notes,
+        metadata,
       });
 
       await AsyncStorage.removeItem(getPodDraftKey(executionId, stopId));
 
-      Alert.alert(t('common.successSaved'), t('mobile.podSuccess'), [
+      Alert.alert(
+        t('common.successSaved'),
+        result === 'queued' ? t('mobile.actionQueuedForSync') : t('mobile.podSuccess'),
+        [
         { text: 'OK', onPress: onSuccess },
-      ]);
+        ]
+      );
     } catch (err) {
       if (__DEV__) {
         console.warn('[pod-submit] failed', err);

@@ -6,15 +6,23 @@ import {
   completeStop,
   generateExecutionsForDate,
   getExecution,
+  getExecutionAudits,
   getExecutionAlerts,
   getExecutionGpsTrack,
   getTodayExecutions,
   listExecutions,
+  receiveRoute,
   setStopArrived,
   setStopInProgress,
+  setStopOnTheWay,
   skipStop,
   substituteDriver,
+  syncWorkflowEvents,
   updateExecutionStatus,
+  workflowRouteCompleted,
+  workflowStopArrived,
+  workflowStopCollected,
+  workflowStopSkipped,
 } from './execution.service';
 
 export const getExecutions = asyncHandler(async (req: Request, res: Response) => {
@@ -53,6 +61,11 @@ export const getSingleExecution = asyncHandler(async (req: Request, res: Respons
   return sendSuccess(res, execution);
 });
 
+export const getExecutionAuditsController = asyncHandler(async (req: Request, res: Response) => {
+  const audits = await getExecutionAudits(req.user!.companyId, req.params.id);
+  return sendSuccess(res, audits);
+});
+
 export const patchExecutionStatus = asyncHandler(async (req: Request, res: Response) => {
   const execution = await updateExecutionStatus(
     req.user!.companyId,
@@ -76,6 +89,70 @@ export const postStopArrived = asyncHandler(async (req: Request, res: Response) 
     req.user
   );
   return sendSuccess(res, execution);
+});
+
+export const postRouteReceived = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await receiveRoute(req.user!.companyId, req.params.id, req.body, req.user);
+  return sendSuccess(res, execution);
+});
+
+export const postStopOnTheWay = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await setStopOnTheWay(
+    req.user!.companyId,
+    req.params.id,
+    req.params.stopId,
+    req.body,
+    req.user
+  );
+  return sendSuccess(res, execution);
+});
+
+export const postWorkflowStopArrived = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await workflowStopArrived(
+    req.user!.companyId,
+    req.params.id,
+    req.params.stopId,
+    req.body,
+    req.user
+  );
+  return sendSuccess(res, execution);
+});
+
+export const postWorkflowStopCollected = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await workflowStopCollected(
+    req.user!.companyId,
+    req.params.id,
+    req.params.stopId,
+    req.body,
+    req.user
+  );
+  return sendSuccess(res, execution);
+});
+
+export const postWorkflowStopSkipped = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await workflowStopSkipped(
+    req.user!.companyId,
+    req.params.id,
+    req.params.stopId,
+    req.body,
+    req.user
+  );
+  return sendSuccess(res, execution);
+});
+
+export const postRouteCompleted = asyncHandler(async (req: Request, res: Response) => {
+  const execution = await workflowRouteCompleted(
+    req.user!.companyId,
+    req.params.id,
+    req.body,
+    req.user
+  );
+  return sendSuccess(res, execution);
+});
+
+export const postSyncWorkflowEvents = asyncHandler(async (req: Request, res: Response) => {
+  const result = await syncWorkflowEvents(req.user!.companyId, req.body.events, req.user);
+  return sendSuccess(res, result);
 });
 
 export const postStopInProgress = asyncHandler(async (req: Request, res: Response) => {

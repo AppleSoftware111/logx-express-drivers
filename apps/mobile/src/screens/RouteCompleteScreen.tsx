@@ -9,8 +9,8 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import { apiClient } from '../services/api';
 import { stopBackgroundGps } from '../services/gpsService';
+import { submitOrQueueWorkflowEvent } from '../services/routeWorkflowService';
 
 interface Stop {
   _id: string;
@@ -34,7 +34,10 @@ export function RouteCompleteScreen({ executionId, routeName, stops, onDone }: P
 
   const completeMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.patch(`/executions/${executionId}/status`, { status: 'COMPLETED' });
+      return submitOrQueueWorkflowEvent({
+        action: 'ROUTE_COMPLETED',
+        executionId,
+      });
     },
     onSuccess: () => {
       void stopBackgroundGps();

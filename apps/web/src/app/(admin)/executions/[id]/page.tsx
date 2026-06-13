@@ -78,6 +78,24 @@ interface ExecutionAlert {
   createdAt: string;
 }
 
+interface ExecutionAudit {
+  _id: string;
+  action: string;
+  stopId?: string;
+  occurredAt: string;
+  source: string;
+  gps?: { lat: number; lng: number; accuracy?: number; recordedAt?: string };
+  expectedLocation?: { lat: number; lng: number };
+  distanceMeters?: number;
+  resolvedAddress?: string;
+  notes?: string;
+  receiverName?: string;
+  photoKey?: string;
+  signatureKey?: string;
+  driverId?: { name?: string; phone?: string };
+  actorUserId?: { email?: string; role?: string };
+}
+
 interface DriverLocationPayload {
   driverId: string;
   executionId?: string;
@@ -167,6 +185,19 @@ export default function ExecutionDetailPage() {
     refetchOnReconnect: true,
   });
 
+  const { data: audits } = useQuery({
+    queryKey: ['execution-audits', id],
+    enabled: hasToken && !!id,
+    queryFn: async () => {
+      const res = await apiClient.get<{ success: boolean; data: ExecutionAudit[] }>(
+        `/executions/${id}/audits`
+      );
+      return res.data.data;
+    },
+    refetchInterval: 30_000,
+    refetchOnReconnect: true,
+  });
+
   useEffect(() => {
     if (!socket || !id) return;
 
@@ -178,6 +209,7 @@ export default function ExecutionDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ['execution', id] });
       void queryClient.invalidateQueries({ queryKey: ['execution-gps', id] });
       void queryClient.invalidateQueries({ queryKey: ['execution-alerts', id] });
+      void queryClient.invalidateQueries({ queryKey: ['execution-audits', id] });
     };
 
     const handleDriverLocation = (payload: DriverLocationPayload) => {
@@ -420,6 +452,51 @@ export default function ExecutionDetailPage() {
                   <div key={alert._id} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
                     <p className="text-xs font-medium text-amber-800">{alert.type}</p>
                     <p className="mt-1 text-xs text-amber-700">{alert.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!audits?.length && (
+            <div className="pt-3 border-t border-gray-100">
+              <p className="text-sm font-semibold text-gray-900">Workflow audit</p>
+              <div className="mt-3 space-y-2">
+                {audits.map((audit) => (
+                  <div key={audit._id} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-gray-900">
+                        {audit.action.replaceAll('_', ' ')}
+                      </p>
+                      <span className="text-[11px] text-gray-400">
+                        {formatDateTime(audit.occurredAt, locale)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      {audit.driverId?.name ?? '-'} · {audit.source}
+                    </p>
+                    {audit.gps && (
+                      <p className="mt-1 font-mono text-[11px] text-gray-600">
+                        {audit.gps.lat.toFixed(5)}, {audit.gps.lng.toFixed(5)}
+                      </p>
+                    )}
+                    {typeof audit.distanceMeters === 'number' && (
+                      <p className="mt-1 text-[11px] text-gray-600">
+                        Distance to stop: {audit.distanceMeters} m
+                      </p>
+                    )}
+                    {audit.resolvedAddress && (
+                      <p className="mt-1 text-[11px] text-gray-500">{audit.resolvedAddress}</p>
+                    )}
+                    {(audit.photoKey || audit.signatureKey || audit.notes) && (
+                      <p className="mt-1 text-[11px] text-green-700">
+                        {audit.photoKey ? 'Photo attached' : ''}
+                        {audit.photoKey && audit.signatureKey ? ' · ' : ''}
+                        {audit.signatureKey ? 'Signature attached' : ''}
+                        {(audit.photoKey || audit.signatureKey) && audit.notes ? ' · ' : ''}
+                        {audit.notes ?? ''}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

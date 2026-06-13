@@ -8,8 +8,9 @@ import { Client } from '../../models/Client.model';
 import { Driver } from '../../models/Driver.model';
 import { GpsPoint } from '../../models/GpsPoint.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
+import { RouteExecutionAudit } from '../../models/RouteExecutionAudit.model';
 import { syncExecutionLifecycle, touchDashboard } from '../executions/execution.service';
-import { isWithinRadius } from '../../utils/haversine';
+import { haversineDistance, isWithinRadius } from '../../utils/haversine';
 
 interface BufferedGpsPoint extends GpsPointInput {
   companyId: string;
@@ -108,7 +109,7 @@ export async function checkGeofenceArrivals(
   }
 
   for (const stop of execution.stops) {
-    if (stop.status !== 'PENDING') continue;
+    if (!['PENDING', 'ON_THE_WAY'].includes(stop.status)) continue;
 
     const targetLat = stop.location.lat;
     const targetLng = stop.location.lng;
@@ -116,6 +117,10 @@ export async function checkGeofenceArrivals(
     if (isWithinRadius(lat, lng, targetLat, targetLng, GEOFENCE_RADIUS_METERS)) {
       stop.status = 'ARRIVED';
       stop.arrivedAt = new Date();
+      stop.arrivalLocation = { lat, lng };
+      stop.arrivalDistanceMeters = Math.round(
+        haversineDistance(lat, lng, targetLat, targetLng)
+      );
 
       // Auto-progress execution to IN_PROGRESS on first arrival
       if (execution.status === 'ASSIGNED' || execution.status === 'ACCEPTED') {
@@ -127,6 +132,28 @@ export async function checkGeofenceArrivals(
 
       syncExecutionLifecycle(execution);
       await execution.save();
+      await RouteExecutionAudit.create({
+        companyId,
+        routeId: execution.routeId,
+        executionId: execution._id,
+        stopId: stop._id,
+        action: 'STOP_ARRIVED',
+        driverId: execution.driverId,
+        clientEventId: `geofence:${execution._id}:${stop._id}:${stop.arrivedAt.toISOString()}`,
+        occurredAt: stop.arrivedAt,
+        serverReceivedAt: new Date(),
+        source: 'geofence',
+        gps: {
+          lat,
+          lng,
+          recordedAt: stop.arrivedAt,
+        },
+        expectedLocation: {
+          lat: targetLat,
+          lng: targetLng,
+        },
+        distanceMeters: stop.arrivalDistanceMeters,
+      });
       touchDashboard(companyId);
 
       // Get the client name from populated data

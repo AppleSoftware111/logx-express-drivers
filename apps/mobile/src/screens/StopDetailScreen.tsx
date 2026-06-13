@@ -15,9 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatTimeByLocale, getRouteStopTypeLabel, resolveApiErrorMessage } from '@logx/i18n';
 
-import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { activateTrackedExecution, ensureGpsReadyForRouteStart } from '../services/gpsService';
+import { submitOrQueueWorkflowEvent } from '../services/routeWorkflowService';
 
 interface Stop {
   _id: string;
@@ -43,18 +43,34 @@ interface Props {
 export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
   const { t } = useTranslation();
   const { locale } = useLocaleStore();
-  const { isOnline } = useNetworkStatus();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
-  const arrived = useMutation({
+  const onTheWay = useMutation({
     mutationFn: async () => {
-      await apiClient.post(`/executions/${executionId}/stops/${stop._id}/arrived`);
+      const readiness = await ensureGpsReadyForRouteStart();
+      if (!readiness.ready) {
+        throw new Error('gps_not_ready');
+      }
+      const result = await submitOrQueueWorkflowEvent({
+        action: 'STOP_ON_THE_WAY',
+        executionId,
+        stopId: stop._id,
+      });
+      await activateTrackedExecution(executionId);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      if (result === 'queued') {
+        Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
+      }
     },
     onError: (err) => {
+      if (err instanceof Error && err.message === 'gps_not_ready') {
+        Alert.alert(t('common.errorTitle'), t('mobile.gpsRequiredToStart'));
+        return;
+      }
       const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } };
       const message = axiosErr.response?.data
         ? resolveApiErrorMessage(axiosErr.response.data, locale)
@@ -63,24 +79,37 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     },
   });
 
-  const startPickup = useMutation({
+  const arrived = useMutation({
     mutationFn: async () => {
-      await apiClient.post(`/executions/${executionId}/stops/${stop._id}/start`);
+      return submitOrQueueWorkflowEvent({
+        action: 'STOP_ARRIVED',
+        executionId,
+        stopId: stop._id,
+      });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      if (result === 'queued') {
+        Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
+      }
     },
-    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.startStopFailed')),
+    onError: () => Alert.alert(t('common.errorTitle'), t('mobile.arrivalFailed')),
   });
 
   const skipStop = useMutation({
     mutationFn: async () => {
-      await apiClient.post(`/executions/${executionId}/stops/${stop._id}/skip`, {
-        reason: t('mobile.skipReasonDefault'),
+      return submitOrQueueWorkflowEvent({
+        action: 'STOP_SKIPPED',
+        executionId,
+        stopId: stop._id,
+        notes: t('mobile.skipReasonDefault'),
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      if (result === 'queued') {
+        Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
+      }
     },
     onError: () => Alert.alert(t('common.errorTitle'), t('mobile.skipStopFailed')),
   });
@@ -111,9 +140,9 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('mobile.stopTimeline')}</Text>
         <View style={styles.timeline}>
+          <TimelineRow label={t('mobile.onTheWay')} time={formatTime(stop.startedAt)} done={!!stop.startedAt} />
           <TimelineRow label={t('mobile.arrived')} time={formatTime(stop.arrivedAt)} done={!!stop.arrivedAt} />
-          <TimelineRow label={t('mobile.started')} time={formatTime(stop.startedAt)} done={!!stop.startedAt} />
-          <TimelineRow label={t('mobile.completedLabel')} time={formatTime(stop.completedAt)} done={!!stop.completedAt} />
+          <TimelineRow label={t('mobile.collected')} time={formatTime(stop.completedAt)} done={!!stop.completedAt} />
         </View>
         {stop.waitingTimeMinutes !== undefined && stop.waitingTimeMinutes > 0 && (
           <View style={styles.waitingBadge}>
@@ -138,74 +167,50 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
 
         {stop.status === 'PENDING' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.arrivedButton]}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
-                return;
-              }
-              arrived.mutate();
-            }}
-            disabled={arrived.isPending || !isOnline}
+            style={[styles.actionButton, styles.startButton]}
+            onPress={() => onTheWay.mutate()}
+            disabled={onTheWay.isPending}
           >
-            {arrived.isPending ? (
+            {onTheWay.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={[styles.actionButtonText, { color: '#fff' }]}>📍 {t('mobile.markArrived')}</Text>
+              <Text style={[styles.actionButtonText, { color: '#fff' }]}>▶ {t('mobile.onTheWay')}</Text>
             )}
           </TouchableOpacity>
         )}
 
-        {stop.status === 'ARRIVED' && (
+        {stop.status === 'ON_THE_WAY' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.startButton]}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
-                return;
-              }
-              startPickup.mutate();
-            }}
-            disabled={startPickup.isPending || !isOnline}
+            style={[styles.actionButton, styles.arrivedButton]}
+            onPress={() => arrived.mutate()}
+            disabled={arrived.isPending}
           >
-            {startPickup.isPending ? (
+            {arrived.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={[styles.actionButtonText, { color: '#fff' }]}>
-                ▶ {stop.type === 'DELIVERY' ? t('mobile.startDelivery') : t('mobile.startPickup')}
+                📍 {t('mobile.markArrived')}
               </Text>
             )}
           </TouchableOpacity>
         )}
 
-        {stop.status === 'IN_PROGRESS' && (
+        {['ARRIVED', 'IN_PROGRESS'].includes(stop.status) && (
           <TouchableOpacity
             style={[styles.actionButton, styles.completeButton]}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
-                return;
-              }
-              onOpenPOD();
-            }}
+            onPress={onOpenPOD}
           >
             <Text style={[styles.actionButtonText, { color: '#fff' }]}>
-              ✅ {t('mobile.completeCapturePod')}
+              ✅ {t('mobile.collected')}
             </Text>
           </TouchableOpacity>
         )}
 
-        {['PENDING', 'ARRIVED'].includes(stop.status) && (
+        {['PENDING', 'ON_THE_WAY', 'ARRIVED'].includes(stop.status) && (
           <TouchableOpacity
             style={[styles.actionButton, styles.skipButton]}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineStopAction'));
-                return;
-              }
-              skipStop.mutate();
-            }}
-            disabled={skipStop.isPending || !isOnline}
+            onPress={() => skipStop.mutate()}
+            disabled={skipStop.isPending}
           >
             {skipStop.isPending ? (
               <ActivityIndicator color="#fff" />

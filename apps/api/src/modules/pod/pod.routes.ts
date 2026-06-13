@@ -69,7 +69,7 @@ router.post(
       req.user
     );
 
-    return sendSuccess(res, stop);
+    return sendSuccess(res, { stop, photoKey, signatureKey });
   })
 );
 

@@ -44,10 +44,20 @@ export enum ExecutionStatus {
 
 export enum StopStatus {
   PENDING = 'PENDING',
+  ON_THE_WAY = 'ON_THE_WAY',
   ARRIVED = 'ARRIVED',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
   SKIPPED = 'SKIPPED',
+}
+
+export enum RouteWorkflowAction {
+  ROUTE_RECEIVED = 'ROUTE_RECEIVED',
+  STOP_ON_THE_WAY = 'STOP_ON_THE_WAY',
+  STOP_ARRIVED = 'STOP_ARRIVED',
+  STOP_COLLECTED = 'STOP_COLLECTED',
+  ROUTE_COMPLETED = 'ROUTE_COMPLETED',
+  STOP_SKIPPED = 'STOP_SKIPPED',
 }
 
 export enum AlertType {

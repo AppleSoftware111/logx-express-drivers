@@ -21,7 +21,12 @@ import {
 import { apiClient } from '../services/api';
 import { useLocaleStore } from '../stores/localeStore';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { activateTrackedExecution, getTrackedExecutionId, stopBackgroundGps } from '../services/gpsService';
+import {
+  ensureGpsReadyForRouteStart,
+  getTrackedExecutionId,
+  stopBackgroundGps,
+} from '../services/gpsService';
+import { submitOrQueueWorkflowEvent } from '../services/routeWorkflowService';
 import { StopDetailScreen } from './StopDetailScreen';
 import { PODCaptureScreen } from './PODCaptureScreen';
 
@@ -104,18 +109,30 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     }
   }, [execution?.status]);
 
-  const startRoute = useMutation({
+  const receiveRoute = useMutation({
     mutationFn: async () => {
-      await apiClient.patch(`/executions/${executionId}/status`, { status: 'IN_PROGRESS' });
+      const readiness = await ensureGpsReadyForRouteStart();
+      if (!readiness.ready) {
+        throw new Error('gps_not_ready');
+      }
+      return submitOrQueueWorkflowEvent({
+        action: 'ROUTE_RECEIVED',
+        executionId,
+      });
     },
-    onSuccess: () => {
-      setIsTracking(true);
+    onSuccess: (result) => {
       setGpsWarning(null);
-      void activateTrackedExecution(executionId);
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
       void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
+      if (result === 'queued') {
+        Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
+      }
     },
     onError: (err) => {
+      if (err instanceof Error && err.message === 'gps_not_ready') {
+        Alert.alert(t('common.errorTitle'), t('mobile.gpsRequiredToStart'));
+        return;
+      }
       const axiosErr = err as { response?: { data?: { error?: { code?: string; message?: string } } } };
       const message = axiosErr.response?.data
         ? resolveApiErrorMessage(axiosErr.response.data, locale)
@@ -237,6 +254,9 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
           <Text style={styles.summaryMeta}>
             {t('common.status')}: {execution.status}
           </Text>
+          {execution.status === 'ACCEPTED' && (
+            <Text style={styles.summaryMeta}>{t('mobile.routeReceived')}</Text>
+          )}
           {execution.driverId?.phone && (
             <Text style={styles.summaryMeta}>
               {t('common.phone')}: {execution.driverId.phone}
@@ -302,32 +322,20 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         {execution?.status === 'PENDING' || execution?.status === 'ASSIGNED' ? (
           <TouchableOpacity
             style={styles.startBtn}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineStartRoute'));
-                return;
-              }
-              startRoute.mutate();
-            }}
-            disabled={startRoute.isPending || !isOnline}
+            onPress={() => receiveRoute.mutate()}
+            disabled={receiveRoute.isPending}
           >
-            {startRoute.isPending ? (
+            {receiveRoute.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.startBtnText}>▶ {t('mobile.startRoute')}</Text>
+              <Text style={styles.startBtnText}>✓ {t('mobile.routeReceivedAction')}</Text>
             )}
           </TouchableOpacity>
         ) : allCompleted && execution?.status === 'IN_PROGRESS' ? (
           <TouchableOpacity
             style={styles.completeBtn}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert(t('common.errorTitle'), t('mobile.offlineCompleteRoute'));
-                return;
-              }
-              completeRoute.mutate();
-            }}
-            disabled={completeRoute.isPending || !isOnline}
+            onPress={() => completeRoute.mutate()}
+            disabled={completeRoute.isPending}
           >
             {completeRoute.isPending ? (
               <ActivityIndicator color="#fff" />

@@ -11,6 +11,7 @@ export interface IExecutionStop {
   expectedDurationMinutes: number;
   type: string;
   status: string;
+  onTheWayAt?: Date;
   arrivedAt?: Date;
   startedAt?: Date;
   completedAt?: Date;
@@ -20,6 +21,11 @@ export interface IExecutionStop {
   receiverName?: string;
   deliveryNotes?: string;
   deliveryLocation?: { lat: number; lng: number };
+  arrivalLocation?: { lat: number; lng: number };
+  arrivalAddress?: string;
+  arrivalDistanceMeters?: number;
+  collectionAddress?: string;
+  collectionDistanceMeters?: number;
   instructions?: string;
 }
 
@@ -61,9 +67,10 @@ const executionStopSchema = new Schema<IExecutionStop>(
     type: { type: String, enum: ['PICKUP', 'DELIVERY', 'BOTH'], required: true },
     status: {
       type: String,
-      enum: ['PENDING', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'],
+      enum: ['PENDING', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'],
       default: 'PENDING',
     },
+    onTheWayAt: { type: Date },
     arrivedAt: { type: Date },
     startedAt: { type: Date },
     completedAt: { type: Date },
@@ -77,6 +84,14 @@ const executionStopSchema = new Schema<IExecutionStop>(
       lat: { type: Number },
       lng: { type: Number },
     },
+    arrivalLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    arrivalAddress: { type: String },
+    arrivalDistanceMeters: { type: Number },
+    collectionAddress: { type: String },
+    collectionDistanceMeters: { type: Number },
   },
   { timestamps: false }
 );
