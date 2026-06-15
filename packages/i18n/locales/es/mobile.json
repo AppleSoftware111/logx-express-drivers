@@ -61,6 +61,11 @@
   "permissions": "Permisos",
   "foregroundLocation": "Ubicación en primer plano",
   "backgroundLocation": "Ubicación en segundo plano",
+  "notificationPermission": "Notificaciones",
+  "notificationPermissionHint": "Las notificaciones deben permanecer activas para que Android mantenga el seguimiento de la ruta con la pantalla bloqueada.",
+  "enableNotifications": "Activar notificaciones",
+  "openSystemSettings": "Abrir ajustes del sistema",
+  "notificationRequiredForTracking": "Permita las notificaciones para esta app para que Android mantenga activo el servicio de GPS durante las rutas en curso.",
   "permissionGranted": "Concedido",
   "permissionDenied": "Denegado",
   "permissionUnknown": "No definido",
@@ -85,5 +90,5 @@
   "offlinePodSubmit": "La prueba de entrega quedó guardada localmente, pero el envío requiere internet.",
   "podValidation": "Agregue el nombre del receptor o capture una foto antes de completar la parada.",
   "actionQueuedForSync": "Guardado en este dispositivo. Se sincronizará automáticamente cuando haya conexión disponible.",
-  "gpsRequiredToStart": "Active el GPS y conceda permisos de ubicación en primer plano y en segundo plano antes de iniciar el seguimiento de la ruta."
+  "gpsRequiredToStart": "Active el GPS y conceda permisos de ubicación en primer plano, en segundo plano y de notificaciones antes de iniciar el seguimiento de la ruta."
 }

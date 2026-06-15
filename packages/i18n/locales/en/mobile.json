@@ -61,6 +61,11 @@
   "permissions": "Permissions",
   "foregroundLocation": "Foreground location",
   "backgroundLocation": "Background location",
+  "notificationPermission": "Notifications",
+  "notificationPermissionHint": "Notifications must stay enabled so Android can keep route tracking active while the screen is locked.",
+  "enableNotifications": "Enable notifications",
+  "openSystemSettings": "Open system settings",
+  "notificationRequiredForTracking": "Allow notifications for this app so Android can keep the GPS tracking service alive during active routes.",
   "permissionGranted": "Granted",
   "permissionDenied": "Denied",
   "permissionUnknown": "Not determined",
@@ -85,5 +90,5 @@
   "offlinePodSubmit": "Proof of delivery is saved locally, but submission requires internet access.",
   "podValidation": "Add a receiver name or capture a photo before completing the stop.",
   "actionQueuedForSync": "Saved on this device. It will sync automatically when the connection is available.",
-  "gpsRequiredToStart": "Enable GPS and grant foreground and background location permission before starting route tracking."
+  "gpsRequiredToStart": "Enable GPS and grant foreground, background, and notification permission before starting route tracking."
 }

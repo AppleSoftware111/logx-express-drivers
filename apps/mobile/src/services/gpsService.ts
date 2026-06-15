@@ -1,7 +1,9 @@
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
 
@@ -29,10 +31,59 @@ export interface GpsReadiness {
   servicesEnabled: boolean;
   foregroundGranted: boolean;
   backgroundGranted: boolean;
+  notificationGranted: boolean;
   ready: boolean;
 }
 
 let currentExecutionId: string | null = null;
+
+export type NotificationPermissionState = 'granted' | 'denied' | 'undetermined';
+
+function requiresNotificationPermission(): boolean {
+  return Platform.OS === 'android' && Number(Platform.Version) >= 33;
+}
+
+export async function getNotificationPermissionState(): Promise<NotificationPermissionState> {
+  if (!requiresNotificationPermission()) {
+    return 'granted';
+  }
+
+  try {
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.granted) {
+      return 'granted';
+    }
+
+    if (permission.canAskAgain === false || permission.status === 'denied') {
+      return 'denied';
+    }
+
+    return 'undetermined';
+  } catch {
+    return 'undetermined';
+  }
+}
+
+export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
+  if (!requiresNotificationPermission()) {
+    return 'granted';
+  }
+
+  try {
+    const permission = await Notifications.requestPermissionsAsync();
+    if (permission.granted) {
+      return 'granted';
+    }
+
+    if (permission.canAskAgain === false || permission.status === 'denied') {
+      return 'denied';
+    }
+  } catch {
+    // Fall back to undetermined.
+  }
+
+  return 'undetermined';
+}
 
 async function readQueuedGpsPayloads(): Promise<GpsPayload[]> {
   const raw = await AsyncStorage.getItem(GPS_QUEUE_STORAGE_KEY);
@@ -185,24 +236,30 @@ export async function requestLocationPermissions(): Promise<boolean> {
   if (foreground !== 'granted') return false;
 
   const { status: background } = await Location.requestBackgroundPermissionsAsync();
-  return background === 'granted';
+  if (background !== 'granted') return false;
+
+  const notificationPermission = await requestNotificationPermission();
+  return notificationPermission === 'granted';
 }
 
 export async function checkGpsReadiness(): Promise<GpsReadiness> {
-  const [servicesEnabled, foreground, background] = await Promise.all([
+  const [servicesEnabled, foreground, background, notificationPermission] = await Promise.all([
     Location.hasServicesEnabledAsync(),
     Location.getForegroundPermissionsAsync(),
     Location.getBackgroundPermissionsAsync(),
+    getNotificationPermissionState(),
   ]);
 
   const foregroundGranted = foreground.status === 'granted';
   const backgroundGranted = background.status === 'granted';
+  const notificationGranted = notificationPermission === 'granted';
 
   return {
     servicesEnabled,
     foregroundGranted,
     backgroundGranted,
-    ready: servicesEnabled && foregroundGranted && backgroundGranted,
+    notificationGranted,
+    ready: servicesEnabled && foregroundGranted && backgroundGranted && notificationGranted,
   };
 }
 
@@ -213,15 +270,18 @@ export async function requestRequiredLocationPermissions(): Promise<GpsReadiness
     foreground.status === 'granted'
       ? await Location.requestBackgroundPermissionsAsync()
       : await Location.getBackgroundPermissionsAsync();
+  const notificationPermission = await requestNotificationPermission();
 
   const foregroundGranted = foreground.status === 'granted';
   const backgroundGranted = background.status === 'granted';
+  const notificationGranted = notificationPermission === 'granted';
 
   return {
     servicesEnabled,
     foregroundGranted,
     backgroundGranted,
-    ready: servicesEnabled && foregroundGranted && backgroundGranted,
+    notificationGranted,
+    ready: servicesEnabled && foregroundGranted && backgroundGranted && notificationGranted,
   };
 }
 

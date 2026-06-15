@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -113,6 +114,9 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
     mutationFn: async () => {
       const readiness = await ensureGpsReadyForRouteStart();
       if (!readiness.ready) {
+        if (!readiness.notificationGranted) {
+          throw new Error('notifications_not_ready');
+        }
         throw new Error('gps_not_ready');
       }
       return submitOrQueueWorkflowEvent({
@@ -129,6 +133,22 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       }
     },
     onError: (err) => {
+      if (err instanceof Error && err.message === 'notifications_not_ready') {
+        Alert.alert(
+          t('common.errorTitle'),
+          t('mobile.notificationRequiredForTracking'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('mobile.openSystemSettings'),
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ]
+        );
+        return;
+      }
       if (err instanceof Error && err.message === 'gps_not_ready') {
         Alert.alert(t('common.errorTitle'), t('mobile.gpsRequiredToStart'));
         return;

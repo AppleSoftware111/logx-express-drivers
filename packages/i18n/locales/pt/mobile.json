@@ -61,6 +61,11 @@
   "permissions": "Permissões",
   "foregroundLocation": "Localização em primeiro plano",
   "backgroundLocation": "Localização em segundo plano",
+  "notificationPermission": "Notificações",
+  "notificationPermissionHint": "As notificações precisam ficar ativas para que o Android mantenha o rastreamento da rota funcionando com a tela bloqueada.",
+  "enableNotifications": "Ativar notificações",
+  "openSystemSettings": "Abrir configurações do sistema",
+  "notificationRequiredForTracking": "Permita notificações para este app para que o Android mantenha o serviço de GPS ativo durante rotas em andamento.",
   "permissionGranted": "Concedida",
   "permissionDenied": "Negada",
   "permissionUnknown": "Não definida",
@@ -85,5 +90,5 @@
   "offlinePodSubmit": "O comprovante ficou salvo localmente, mas o envio exige internet.",
   "podValidation": "Adicione o nome do recebedor ou capture uma foto antes de concluir a parada.",
   "actionQueuedForSync": "Salvo neste dispositivo. A sincronização será automática quando a conexão estiver disponível.",
-  "gpsRequiredToStart": "Ative o GPS e conceda permissão de localização em primeiro plano e em segundo plano antes de iniciar o rastreamento da rota."
+  "gpsRequiredToStart": "Ative o GPS e conceda permissão de localização em primeiro plano, em segundo plano e de notificações antes de iniciar o rastreamento da rota."
 }

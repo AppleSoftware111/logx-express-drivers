@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SupportedLocale } from '@logx/i18n';
 
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
+import {
+  getNotificationPermissionState,
+  requestNotificationPermission,
+  type NotificationPermissionState,
+} from '../services/gpsService';
 import { useAuthStore } from '../stores/authStore';
 import { useLocaleStore } from '../stores/localeStore';
 
@@ -34,16 +40,25 @@ export function SettingsScreen({ onClose }: Props) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [foregroundPermission, setForegroundPermission] = useState<PermissionState>('undetermined');
   const [backgroundPermission, setBackgroundPermission] = useState<PermissionState>('undetermined');
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>('undetermined');
+  const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+
+  const refreshPermissions = async () => {
+    const [foreground, background, notifications] = await Promise.all([
+      Location.getForegroundPermissionsAsync(),
+      Location.getBackgroundPermissionsAsync(),
+      getNotificationPermissionState(),
+    ]);
+
+    setForegroundPermission(foreground.status);
+    setBackgroundPermission(background.status);
+    setNotificationPermission(notifications);
+  };
 
   useEffect(() => {
     void (async () => {
-      const [foreground, background] = await Promise.all([
-        Location.getForegroundPermissionsAsync(),
-        Location.getBackgroundPermissionsAsync(),
-      ]);
-
-      setForegroundPermission(foreground.status);
-      setBackgroundPermission(background.status);
+      await refreshPermissions();
     })();
   }, []);
 
@@ -78,6 +93,38 @@ export function SettingsScreen({ onClose }: Props) {
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const runtimeVersion = Constants.expoConfig?.runtimeVersion ?? 'local';
   const appName = Constants.expoConfig?.name ?? t('common.appName');
+
+  const handleNotificationPermission = async () => {
+    if (notificationPermission === 'granted') {
+      await Linking.openSettings();
+      return;
+    }
+
+    setIsUpdatingNotifications(true);
+    try {
+      const result = await requestNotificationPermission();
+      setNotificationPermission(result);
+
+      if (result !== 'granted') {
+        Alert.alert(
+          t('common.errorTitle'),
+          t('mobile.notificationRequiredForTracking'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('mobile.openSystemSettings'),
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ]
+        );
+      }
+    } finally {
+      setIsUpdatingNotifications(false);
+      await refreshPermissions();
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -139,6 +186,26 @@ export function SettingsScreen({ onClose }: Props) {
           label={t('mobile.backgroundLocation')}
           status={backgroundPermission}
         />
+        <PermissionRow
+          label={t('mobile.notificationPermission')}
+          status={notificationPermission}
+        />
+        <Text style={styles.helperText}>{t('mobile.notificationPermissionHint')}</Text>
+        <TouchableOpacity
+          style={[styles.settingsActionButton, isUpdatingNotifications && styles.settingsActionButtonDisabled]}
+          onPress={() => void handleNotificationPermission()}
+          disabled={isUpdatingNotifications}
+        >
+          {isUpdatingNotifications ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.settingsActionButtonText}>
+              {notificationPermission === 'granted'
+                ? t('mobile.openSystemSettings')
+                : t('mobile.enableNotifications')}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
@@ -280,6 +347,21 @@ const styles = StyleSheet.create({
   },
   inlineLoader: {
     marginTop: 12,
+  },
+  settingsActionButton: {
+    marginTop: 12,
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  settingsActionButtonDisabled: {
+    opacity: 0.7,
+  },
+  settingsActionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   infoRow: {
     flexDirection: 'row',
