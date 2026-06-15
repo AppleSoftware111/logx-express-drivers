@@ -30,6 +30,11 @@
   "notSet": "Não definido",
   "alerts": "Alertas",
   "proofOfDeliveryAttached": "Comprovante de entrega anexado",
+  "arrivedLocation": "Local de chegada",
+  "collectedLocation": "Local da coleta",
+  "capturedAddress": "Endereço capturado",
+  "gpsCoordinates": "Coordenadas GPS",
+  "distanceToStop": "Distância até a parada",
   "replayGps": "Reproduzir GPS",
   "pause": "Pausar"
 }

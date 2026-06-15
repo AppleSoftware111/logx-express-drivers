@@ -28,6 +28,37 @@ interface GpsPoint {
   recordedAt: string;
 }
 
+interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+interface ExecutionStop {
+  _id: string;
+  order: number;
+  status: string;
+  address: string;
+  location: LatLng;
+  plannedTime?: string;
+  expectedDurationMinutes?: number;
+  instructions?: string;
+  clientId: { name: string; type: string };
+  arrivedAt?: string;
+  startedAt?: string;
+  completedAt?: string;
+  waitingTimeMinutes?: number;
+  podPhoto?: string;
+  podSignature?: string;
+  receiverName?: string;
+  deliveryNotes?: string;
+  deliveryLocation?: LatLng;
+  arrivalLocation?: LatLng;
+  arrivalAddress?: string;
+  arrivalDistanceMeters?: number;
+  collectionAddress?: string;
+  collectionDistanceMeters?: number;
+}
+
 interface ExecutionDetail {
   _id: string;
   status: string;
@@ -48,26 +79,7 @@ interface ExecutionDetail {
   originalDriverId: { name: string };
   isSubstitution: boolean;
   contractId?: { slaMinutes?: number; clientId?: { name?: string } };
-  stops: Array<{
-    _id: string;
-    order: number;
-    status: string;
-    address: string;
-    location: { lat: number; lng: number };
-    plannedTime?: string;
-    expectedDurationMinutes?: number;
-    instructions?: string;
-    clientId: { name: string; type: string };
-    arrivedAt?: string;
-    startedAt?: string;
-    completedAt?: string;
-    waitingTimeMinutes?: number;
-    podPhoto?: string;
-    podSignature?: string;
-    receiverName?: string;
-    deliveryNotes?: string;
-    deliveryLocation?: { lat: number; lng: number };
-  }>;
+  stops: ExecutionStop[];
 }
 
 interface ExecutionAlert {
@@ -105,6 +117,58 @@ interface DriverLocationPayload {
 }
 
 const REPLAY_SPEED_OPTIONS = [1, 2, 5] as const;
+
+function formatCoordinates(location?: LatLng) {
+  if (!location) return null;
+  return `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`;
+}
+
+function formatDistanceMeters(distanceMeters?: number) {
+  if (typeof distanceMeters !== 'number') return null;
+  return `${Math.round(distanceMeters)} m`;
+}
+
+function getLatestStopAudit(
+  audits: ExecutionAudit[] | undefined,
+  stopId: string,
+  action: 'STOP_ARRIVED' | 'STOP_COLLECTED'
+) {
+  return audits?.reduce<ExecutionAudit | undefined>((latest, audit) => {
+    if (audit.stopId !== stopId || audit.action !== action) return latest;
+    if (!latest) return audit;
+    return new Date(audit.occurredAt).getTime() > new Date(latest.occurredAt).getTime()
+      ? audit
+      : latest;
+  }, undefined);
+}
+
+function getStopLocationProof(
+  stop: ExecutionStop,
+  audits: ExecutionAudit[] | undefined,
+  kind: 'arrived' | 'collected'
+) {
+  const audit = getLatestStopAudit(
+    audits,
+    stop._id,
+    kind === 'arrived' ? 'STOP_ARRIVED' : 'STOP_COLLECTED'
+  );
+
+  if (kind === 'arrived') {
+    return {
+      occurredAt: stop.arrivedAt ?? audit?.occurredAt,
+      location: stop.arrivalLocation ?? audit?.gps,
+      address: stop.arrivalAddress ?? audit?.resolvedAddress,
+      distanceMeters: stop.arrivalDistanceMeters ?? audit?.distanceMeters,
+    };
+  }
+
+  return {
+    occurredAt: stop.completedAt ?? audit?.occurredAt,
+    location: stop.deliveryLocation ?? audit?.gps,
+    address: stop.collectionAddress ?? audit?.resolvedAddress,
+    distanceMeters: stop.collectionDistanceMeters ?? audit?.distanceMeters,
+  };
+}
 
 function ExecutionMapAutoFit({
   points,
@@ -367,79 +431,144 @@ export default function ExecutionDetailPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {execution?.stops.map((stop, i) => (
-            <div key={stop._id} className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${
-                    stop.status === 'COMPLETED'
-                      ? 'bg-green-500'
-                      : stop.status === 'SKIPPED'
-                        ? 'bg-gray-400'
-                        : stop.status === 'IN_PROGRESS'
-                          ? 'bg-yellow-500'
-                          : stop.status === 'ARRIVED'
-                            ? 'bg-cyan-500'
-                            : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                {i < execution.stops.length - 1 && (
-                  <div className="w-0.5 h-8 bg-gray-200 mt-1" />
-                )}
-              </div>
-              <div className="flex-1 pb-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-sm text-gray-900">{stop.clientId?.name}</p>
-                  <span className="text-xs font-mono text-gray-500">
-                    {stop.plannedTime ?? execution?.scheduledTime}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">{stop.address}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {stop.expectedDurationMinutes ?? 15} min service
-                </p>
-                <p className="mt-1 text-xs font-medium text-gray-500">
-                  {getStopStatusLabel(stop.status, locale)}
-                </p>
+          {execution?.stops.map((stop, i) => {
+            const arrivedProof = getStopLocationProof(stop, audits, 'arrived');
+            const collectedProof = getStopLocationProof(stop, audits, 'collected');
+            const arrivedCoordinates = formatCoordinates(arrivedProof.location);
+            const collectedCoordinates = formatCoordinates(collectedProof.location);
+            const arrivedDistance = formatDistanceMeters(arrivedProof.distanceMeters);
+            const collectedDistance = formatDistanceMeters(collectedProof.distanceMeters);
+            const hasArrivedProof = arrivedProof.occurredAt || arrivedCoordinates || arrivedProof.address || arrivedDistance;
+            const hasCollectedProof = collectedProof.occurredAt || collectedCoordinates || collectedProof.address || collectedDistance;
 
-                {stop.arrivedAt && (
+            return (
+              <div key={stop._id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${
+                      stop.status === 'COMPLETED'
+                        ? 'bg-green-500'
+                        : stop.status === 'SKIPPED'
+                          ? 'bg-gray-400'
+                          : stop.status === 'IN_PROGRESS'
+                            ? 'bg-yellow-500'
+                            : stop.status === 'ARRIVED'
+                              ? 'bg-cyan-500'
+                              : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {i + 1}
+                  </div>
+                  {i < execution.stops.length - 1 && (
+                    <div className="w-0.5 h-8 bg-gray-200 mt-1" />
+                  )}
+                </div>
+                <div className="flex-1 pb-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-sm text-gray-900">{stop.clientId?.name}</p>
+                    <span className="text-xs font-mono text-gray-500">
+                      {stop.plannedTime ?? execution?.scheduledTime}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{stop.address}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {t('arrive')}: {formatDateTime(stop.arrivedAt, locale)}
+                    {stop.expectedDurationMinutes ?? 15} min service
                   </p>
-                )}
-                {stop.completedAt && (
-                  <p className="text-xs text-gray-500">
-                    {t('complete')}: {formatDateTime(stop.completedAt, locale)}
+                  <p className="mt-1 text-xs font-medium text-gray-500">
+                    {getStopStatusLabel(stop.status, locale)}
                   </p>
-                )}
-                {stop.waitingTimeMinutes !== undefined && (
-                  <p className="text-xs font-medium text-blue-600 mt-1">
-                    {t('waitingTime')}: {stop.waitingTimeMinutes} min
-                  </p>
-                )}
-                {stop.receiverName && (
-                  <p className="text-xs text-gray-500">{tCommon('receiver')}: {stop.receiverName}</p>
-                )}
-                {stop.instructions && (
-                  <p className="mt-2 rounded-lg bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
-                    {stop.instructions}
-                  </p>
-                )}
-                {stop.deliveryNotes && (
-                  <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
-                    {stop.deliveryNotes}
-                  </p>
-                )}
-                {(stop.podPhoto || stop.podSignature) && (
-                  <p className="mt-2 text-xs font-medium text-green-700">
-                    {t('proofOfDeliveryAttached')}
-                  </p>
-                )}
+
+                  {stop.arrivedAt && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {t('arrive')}: {formatDateTime(stop.arrivedAt, locale)}
+                    </p>
+                  )}
+                  {stop.completedAt && (
+                    <p className="text-xs text-gray-500">
+                      {t('complete')}: {formatDateTime(stop.completedAt, locale)}
+                    </p>
+                  )}
+                  {(hasArrivedProof || hasCollectedProof) && (
+                    <div className="mt-2 space-y-2">
+                      {hasArrivedProof && (
+                        <div className="rounded-lg border border-cyan-100 bg-cyan-50 px-2 py-1.5 text-[11px] text-cyan-900">
+                          <p className="font-semibold">{t('arrivedLocation')}</p>
+                          {arrivedProof.occurredAt && (
+                            <p className="mt-1 text-cyan-800">
+                              {t('arrive')}: {formatDateTime(arrivedProof.occurredAt, locale)}
+                            </p>
+                          )}
+                          {arrivedCoordinates && (
+                            <p className="mt-1 font-mono text-cyan-900">
+                              {t('gpsCoordinates')}: {arrivedCoordinates}
+                            </p>
+                          )}
+                          {arrivedProof.address && (
+                            <p className="mt-1 text-cyan-800">
+                              {t('capturedAddress')}: {arrivedProof.address}
+                            </p>
+                          )}
+                          {arrivedDistance && (
+                            <p className="mt-1 text-cyan-800">
+                              {t('distanceToStop')}: {arrivedDistance}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {hasCollectedProof && (
+                        <div className="rounded-lg border border-green-100 bg-green-50 px-2 py-1.5 text-[11px] text-green-900">
+                          <p className="font-semibold">{t('collectedLocation')}</p>
+                          {collectedProof.occurredAt && (
+                            <p className="mt-1 text-green-800">
+                              {t('complete')}: {formatDateTime(collectedProof.occurredAt, locale)}
+                            </p>
+                          )}
+                          {collectedCoordinates && (
+                            <p className="mt-1 font-mono text-green-900">
+                              {t('gpsCoordinates')}: {collectedCoordinates}
+                            </p>
+                          )}
+                          {collectedProof.address && (
+                            <p className="mt-1 text-green-800">
+                              {t('capturedAddress')}: {collectedProof.address}
+                            </p>
+                          )}
+                          {collectedDistance && (
+                            <p className="mt-1 text-green-800">
+                              {t('distanceToStop')}: {collectedDistance}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {stop.waitingTimeMinutes !== undefined && (
+                    <p className="text-xs font-medium text-blue-600 mt-1">
+                      {t('waitingTime')}: {stop.waitingTimeMinutes} min
+                    </p>
+                  )}
+                  {stop.receiverName && (
+                    <p className="text-xs text-gray-500">{tCommon('receiver')}: {stop.receiverName}</p>
+                  )}
+                  {stop.instructions && (
+                    <p className="mt-2 rounded-lg bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
+                      {stop.instructions}
+                    </p>
+                  )}
+                  {stop.deliveryNotes && (
+                    <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
+                      {stop.deliveryNotes}
+                    </p>
+                  )}
+                  {(stop.podPhoto || stop.podSignature) && (
+                    <p className="mt-2 text-xs font-medium text-green-700">
+                      {t('proofOfDeliveryAttached')}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {!!alerts?.length && (
             <div className="pt-3 border-t border-gray-100">
