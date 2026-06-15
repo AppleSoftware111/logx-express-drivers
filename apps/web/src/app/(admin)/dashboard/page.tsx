@@ -4,11 +4,12 @@ import { useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, Clock, Truck, Users } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
+import { LiveVehicleMarker } from '@/components/maps/LiveVehicleMarker';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 import { useSocket } from '@/hooks/useSocket';
@@ -38,6 +39,7 @@ interface DashboardSummary {
       name: string;
       isOnline: boolean;
       currentLocation?: { lat: number; lng: number; updatedAt?: string };
+      vehicleId?: { plate?: string; type?: string };
     };
   }>;
 }
@@ -53,7 +55,7 @@ interface AdminDriverLocationPayload {
   driverId: string;
   lat: number;
   lng: number;
-  executionId: string;
+  executionId?: string;
   timestamp?: string;
 }
 
@@ -131,7 +133,8 @@ export default function DashboardPage() {
       return res.data.data;
     },
     enabled: hasToken,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
+    refetchOnReconnect: true,
   });
 
   const { data: driversData } = useQuery({
@@ -144,7 +147,8 @@ export default function DashboardPage() {
       }>('/dashboard/live-drivers');
       return res.data.data;
     },
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
+    refetchOnReconnect: true,
   });
 
   // Live driver location updates via socket
@@ -319,25 +323,25 @@ export default function DashboardPage() {
                   gestureHandling="greedy"
                 >
                   <DriverMapAutoFit points={mapPoints} />
-                  {liveDrivers.map((driver) => (
-                    <AdvancedMarker
-                      key={driver._id}
-                      position={{
-                        lat: driver.currentLocation!.lat,
-                        lng: driver.currentLocation!.lng,
-                      }}
-                      title={`${driver.name} — ${driver.vehicleId?.plate ?? t('vehicleUnknown')}`}
-                    >
-                      <div className="drop-shadow-sm">
-                        <Pin
-                          background="#2563eb"
-                          borderColor="#1d4ed8"
-                          glyphColor="#fff"
-                          scale={1.2}
+                  {liveDrivers.map((driver) => {
+                    const freshness = getLocationFreshnessState(driver.currentLocation?.updatedAt);
+
+                    return (
+                      <AdvancedMarker
+                        key={driver._id}
+                        position={{
+                          lat: driver.currentLocation!.lat,
+                          lng: driver.currentLocation!.lng,
+                        }}
+                        title={`${driver.name} — ${driver.vehicleId?.plate ?? t('vehicleUnknown')}`}
+                      >
+                        <LiveVehicleMarker
+                          vehicleType={driver.vehicleId?.type}
+                          freshness={freshness.labelKey}
                         />
-                      </div>
-                    </AdvancedMarker>
-                  ))}
+                      </AdvancedMarker>
+                    );
+                  })}
                 </Map>
               </GoogleMapsProvider>
             </div>
@@ -379,6 +383,12 @@ export default function DashboardPage() {
                           })}
                         </span>
                       </div>
+                      {(freshness.labelKey === 'staleLocation' ||
+                        freshness.labelKey === 'offlineLocation') && (
+                        <p className="mt-1 text-[11px] font-medium text-amber-600">
+                          {t('signalDelayed')}
+                        </p>
+                      )}
                       </div>
                     );
                   })

@@ -67,7 +67,7 @@ router.get(
       })
         .select('status delayMinutes scheduledTime routeId driverId')
         .populate('routeId', 'name')
-        .populate('driverId', 'name isOnline currentLocation')
+        .populate('driverId', 'name isOnline currentLocation vehicleId')
         .lean()
         .sort({ scheduledTime: 1 });
 

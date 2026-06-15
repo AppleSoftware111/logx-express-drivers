@@ -21,6 +21,7 @@
   "staleLocation": "Ubicación desactualizada",
   "offlineLocation": "Seguimiento sin conexión",
   "locationUnknown": "Esperando ubicación",
+  "signalDelayed": "Señal retrasada, esperando GPS más reciente",
   "lastUpdated": "Actualizado: {value}",
   "recentAlerts": "Alertas recientes",
   "noAlerts": "Sin alertas",

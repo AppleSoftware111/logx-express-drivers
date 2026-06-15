@@ -14,6 +14,7 @@ import {
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
+import { LiveVehicleMarker } from '@/components/maps/LiveVehicleMarker';
 import { PaginationControls } from '@/components/ui/PaginationControls';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
@@ -36,6 +37,7 @@ interface Execution {
     isOnline: boolean;
     phone?: string;
     currentLocation?: { lat: number; lng: number; updatedAt?: string };
+    vehicleId?: { plate?: string; type?: string };
   };
   stops: Array<{
     _id: string;
@@ -54,8 +56,11 @@ interface DriverLocation {
   driverId: string;
   lat: number;
   lng: number;
-  executionId: string;
+  executionId?: string;
   timestamp?: string;
+  driverName?: string;
+  vehiclePlate?: string;
+  vehicleType?: string;
 }
 
 interface AdminExecutionUpdatePayload {
@@ -112,7 +117,8 @@ export default function OperationsPage() {
       );
       return res.data.data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
+    refetchOnReconnect: true,
   });
 
   useEffect(() => {
@@ -121,7 +127,10 @@ export default function OperationsPage() {
     const handleDriverLocation = (data: DriverLocation) => {
       setLiveLocations((prev) => ({
         ...prev,
-        [data.driverId]: data,
+        [data.driverId]: {
+          ...prev[data.driverId],
+          ...data,
+        },
       }));
     };
 
@@ -166,6 +175,9 @@ export default function OperationsPage() {
             lat: execution.driverId.currentLocation.lat,
             lng: execution.driverId.currentLocation.lng,
             timestamp: execution.driverId.currentLocation.updatedAt,
+            driverName: execution.driverId.name,
+            vehiclePlate: execution.driverId.vehicleId?.plate,
+            vehicleType: execution.driverId.vehicleId?.type,
           };
         } else if (existingLocation) {
           next[execution.driverId._id] = existingLocation;
@@ -303,6 +315,11 @@ export default function OperationsPage() {
                     ? ` · ${selectedExecution.driverId.phone}`
                     : ''}
                 </p>
+                {selectedExecution.driverId?.vehicleId?.plate ? (
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {selectedExecution.driverId.vehicleId.plate}
+                  </p>
+                ) : null}
                 {selectedDriverLocation?.timestamp ? (
                   <div className="mt-1 flex items-center gap-2 text-[11px]">
                     <span className={`h-2 w-2 rounded-full ${selectedDriverFreshness.dotClassName}`} />
@@ -315,6 +332,12 @@ export default function OperationsPage() {
                       })}
                     </span>
                   </div>
+                ) : null}
+                {selectedDriverFreshness.labelKey === 'staleLocation' ||
+                selectedDriverFreshness.labelKey === 'offlineLocation' ? (
+                  <p className="mt-1 text-[11px] font-medium text-amber-600">
+                    {tDashboard('signalDelayed')}
+                  </p>
                 ) : null}
               </div>
               <Link
@@ -387,14 +410,24 @@ export default function OperationsPage() {
           >
             <OperationsMapAutoFit points={visiblePoints} />
             {/* All live drivers */}
-            {allLiveLocations.map((loc) => (
-              <AdvancedMarker
-                key={loc.driverId}
-                position={{ lat: loc.lat, lng: loc.lng }}
-              >
-                <Pin background="#2563eb" borderColor="#1d4ed8" glyphColor="#fff" scale={1.3} />
-              </AdvancedMarker>
-            ))}
+            {allLiveLocations.map((loc) => {
+              const freshness = getLocationFreshnessState(loc.timestamp);
+              const isSelected = selectedExecution?.driverId?._id === loc.driverId;
+
+              return (
+                <AdvancedMarker
+                  key={loc.driverId}
+                  position={{ lat: loc.lat, lng: loc.lng }}
+                  title={`${loc.driverName ?? selectedExecution?.driverId?.name ?? 'Driver'} — ${loc.vehiclePlate ?? tDashboard('vehicleUnknown')}`}
+                >
+                  <LiveVehicleMarker
+                    vehicleType={loc.vehicleType}
+                    freshness={freshness.labelKey}
+                    highlighted={isSelected}
+                  />
+                </AdvancedMarker>
+              );
+            })}
 
             {/* Selected execution stops */}
             {selectedExecution?.stops.map((stop) => (

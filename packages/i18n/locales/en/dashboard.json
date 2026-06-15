@@ -21,6 +21,7 @@
   "staleLocation": "Stale location",
   "offlineLocation": "Tracking offline",
   "locationUnknown": "Awaiting location",
+  "signalDelayed": "Signal delayed, waiting for fresher GPS",
   "lastUpdated": "Updated: {value}",
   "recentAlerts": "Recent alerts",
   "noAlerts": "No alerts",

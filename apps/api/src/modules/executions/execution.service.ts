@@ -284,7 +284,7 @@ export async function getTodayExecutions(companyId: string, driverId?: string) {
     .select('-__v')
     .populate('routeId', 'name scheduledTime')
     .populate('contractId', 'clientId slaMinutes')
-    .populate('driverId', 'name phone currentLocation')
+    .populate('driverId', 'name phone vehicleId isOnline currentLocation')
     .populate('stops.clientId', 'name address location type')
     .lean()
     .sort({ scheduledTime: 1 });

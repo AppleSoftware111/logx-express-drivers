@@ -14,6 +14,7 @@ import {
   type SupportedLocale,
 } from '@logx/i18n';
 import { SOCKET_EVENTS } from '@logx/shared';
+import { LiveVehicleMarker } from '@/components/maps/LiveVehicleMarker';
 import { GoogleMapsProvider } from '@/components/maps/GoogleMapsProvider';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
@@ -75,6 +76,7 @@ interface ExecutionDetail {
     phone?: string;
     isOnline?: boolean;
     currentLocation?: { lat: number; lng: number; updatedAt?: string };
+    vehicleId?: { plate?: string; type?: string };
   };
   originalDriverId: { name: string };
   isSubstitution: boolean;
@@ -219,7 +221,7 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     refetchOnReconnect: true,
   });
 
@@ -232,7 +234,7 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 5_000,
     refetchOnReconnect: true,
   });
 
@@ -245,7 +247,7 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     refetchOnReconnect: true,
   });
 
@@ -258,7 +260,7 @@ export default function ExecutionDetailPage() {
       );
       return res.data.data;
     },
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
     refetchOnReconnect: true,
   });
 
@@ -718,7 +720,11 @@ export default function ExecutionDetailPage() {
               {currentMarker && (
                 <AdvancedMarker position={currentMarker}>
                   <div className="driver-marker-pulse">
-                    <Pin background="#2563eb" borderColor="#1d4ed8" glyphColor="#fff" scale={1.4} />
+                    <LiveVehicleMarker
+                      vehicleType={execution?.driverId?.vehicleId?.type}
+                      freshness={markerFreshness.labelKey}
+                      highlighted
+                    />
                   </div>
                 </AdvancedMarker>
               )}
