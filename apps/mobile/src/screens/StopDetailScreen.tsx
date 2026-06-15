@@ -27,6 +27,7 @@ interface Stop {
   type: string;
   location: { lat: number; lng: number };
   clientId: { name: string; type: string };
+  onTheWayAt?: string;
   arrivedAt?: string;
   startedAt?: string;
   completedAt?: string;
@@ -62,6 +63,7 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     },
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
       if (result === 'queued') {
         Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
       }
@@ -89,6 +91,7 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     },
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
       if (result === 'queued') {
         Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
       }
@@ -107,6 +110,7 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
     },
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ['execution', executionId] });
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
       if (result === 'queued') {
         Alert.alert(t('common.successSaved'), t('mobile.actionQueuedForSync'));
       }
@@ -140,7 +144,11 @@ export function StopDetailScreen({ executionId, stop, onOpenPOD }: Props) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('mobile.stopTimeline')}</Text>
         <View style={styles.timeline}>
-          <TimelineRow label={t('mobile.onTheWay')} time={formatTime(stop.startedAt)} done={!!stop.startedAt} />
+          <TimelineRow
+            label={t('mobile.onTheWay')}
+            time={formatTime(stop.onTheWayAt ?? stop.startedAt)}
+            done={!!(stop.onTheWayAt ?? stop.startedAt)}
+          />
           <TimelineRow label={t('mobile.arrived')} time={formatTime(stop.arrivedAt)} done={!!stop.arrivedAt} />
           <TimelineRow label={t('mobile.collected')} time={formatTime(stop.completedAt)} done={!!stop.completedAt} />
         </View>

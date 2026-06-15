@@ -290,7 +290,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
             style={[
               styles.stopCard,
               stop.status === 'COMPLETED' && styles.completedStop,
-              stop.status === 'IN_PROGRESS' && styles.activeStop,
+              ['ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'].includes(stop.status) && styles.activeStop,
             ]}
             onPress={() => {
               setSelectedStopId(stop._id);

@@ -87,6 +87,7 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
   socket.on(
     SOCKET_EVENTS.DRIVER_PRESENCE_LOCATION,
     async (payload: {
+      executionId?: string;
       lat: number;
       lng: number;
       speed?: number;
@@ -101,6 +102,7 @@ export function registerGpsHandlers(io: Server, socket: Socket): void {
 
         emitDriverLocationUpdate(companyId, {
           driverId,
+          executionId: payload.executionId,
           lat: payload.lat,
           lng: payload.lng,
           speed: payload.speed,

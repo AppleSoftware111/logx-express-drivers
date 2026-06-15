@@ -5,7 +5,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { SOCKET_EVENTS } from '@logx/shared';
 
 import { useAuthStore } from '../stores/authStore';
-import { flushQueuedGpsPayloads, getCurrentLocation } from '../services/gpsService';
+import {
+  flushQueuedGpsPayloads,
+  getCurrentLocation,
+  getTrackedExecutionId,
+} from '../services/gpsService';
 import { useSocketStore } from '../stores/socketStore';
 
 type DriverRouteRealtimePayload = {
@@ -39,10 +43,14 @@ export function useDriverRealtime() {
     if (!socket || !isAuthenticated) return;
 
     const emitPresenceLocation = async () => {
-      const location = await getCurrentLocation();
+      const [location, executionId] = await Promise.all([
+        getCurrentLocation(),
+        getTrackedExecutionId(),
+      ]);
       if (!location) return;
 
       socket.emit(SOCKET_EVENTS.DRIVER_PRESENCE_LOCATION, {
+        executionId: executionId ?? undefined,
         lat: location.coords.latitude,
         lng: location.coords.longitude,
         speed: location.coords.speed ?? undefined,

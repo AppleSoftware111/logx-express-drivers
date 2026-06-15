@@ -22,6 +22,7 @@ export const UPLOAD_REQUEST_TIMEOUT_MS = 60_000;
 
 type AuthFailureHandler = () => void | Promise<void>;
 let authFailureHandler: AuthFailureHandler | null = null;
+let refreshRequestPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
 
 export type StoredAuthUser = {
   id: string;
@@ -127,6 +128,52 @@ export function isDefinitiveAuthFailure(error: unknown): boolean {
   return err.response?.status === 401 || err.response?.status === 403;
 }
 
+async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken: string }> {
+  if (refreshRequestPromise) {
+    return refreshRequestPromise;
+  }
+
+  refreshRequestPromise = (async () => {
+    const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    if (!refreshToken) {
+      throw new Error('Missing refresh token');
+    }
+
+    const res = await axios.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
+      `${API_URL}/api/auth/refresh`,
+      { refreshToken },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept-Language': useLocaleStore.getState().locale,
+        },
+      }
+    );
+
+    const body = res.data;
+    const accessToken = body.success ? body.data.accessToken : undefined;
+    const rotatedRefreshToken = body.success ? body.data.refreshToken : undefined;
+    if (!accessToken) {
+      throw new Error('Missing refreshed access token');
+    }
+
+    const nextRefreshToken = rotatedRefreshToken ?? refreshToken;
+    await persistAuthSession(accessToken, nextRefreshToken);
+    useAuthStore.getState().updateTokens(accessToken, nextRefreshToken);
+
+    return {
+      accessToken,
+      refreshToken: nextRefreshToken,
+    };
+  })();
+
+  try {
+    return await refreshRequestPromise;
+  } finally {
+    refreshRequestPromise = null;
+  }
+}
+
 export const apiClient = create({
   baseURL: `${API_URL}/api`,
   timeout: 15_000,
@@ -140,6 +187,10 @@ apiClient.interceptors.request.use(async (config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
     config.headers['Accept-Language'] = useLocaleStore.getState().locale;
+
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
   }
   return config;
 });
@@ -153,34 +204,15 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-        if (!refreshToken) {
-          throw new Error('Missing refresh token');
+        const refreshed = await refreshAuthSession();
+        if (!originalRequest.headers) {
+          originalRequest.headers = {};
         }
-
-        const res = await axios.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
-          `${API_URL}/api/auth/refresh`,
-          { refreshToken },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept-Language': useLocaleStore.getState().locale,
-            },
-          }
-        );
-
-        const body = res.data;
-        const newToken = body.success ? body.data.accessToken : undefined;
-        const rotatedRefreshToken = body.success ? body.data.refreshToken : undefined;
-        if (newToken) {
-          await persistAuthSession(newToken, rotatedRefreshToken ?? refreshToken);
-          useAuthStore.getState().updateAccessToken(newToken);
-          if (!originalRequest.headers) {
-            originalRequest.headers = {};
-          }
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          return apiClient(originalRequest);
+        originalRequest.headers.Authorization = `Bearer ${refreshed.accessToken}`;
+        if (typeof FormData !== 'undefined' && originalRequest.data instanceof FormData) {
+          delete originalRequest.headers['Content-Type'];
         }
+        return apiClient(originalRequest);
       } catch (refreshError) {
         if (!isRecoverableNetworkError(refreshError)) {
           await clearAuthSession();
