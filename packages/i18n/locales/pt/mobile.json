@@ -90,5 +90,8 @@
   "offlinePodSubmit": "O comprovante ficou salvo localmente, mas o envio exige internet.",
   "podValidation": "Adicione o nome do recebedor ou capture uma foto antes de concluir a parada.",
   "actionQueuedForSync": "Salvo neste dispositivo. A sincronização será automática quando a conexão estiver disponível.",
-  "gpsRequiredToStart": "Ative o GPS e conceda permissão de localização em primeiro plano, em segundo plano e de notificações antes de iniciar o rastreamento da rota."
+  "gpsRequiredToStart": "Ative o GPS e conceda permissão de localização em primeiro plano, em segundo plano e de notificações antes de iniciar o rastreamento da rota.",
+  "batteryOptimization": "Otimização de bateria",
+  "batteryOptimizationHint": "Alguns celulares (Xiaomi, Samsung, Motorola e outros) interrompem o rastreamento quando a tela é bloqueada. Desative a otimização de bateria para este app para manter o GPS ativo durante a rota.",
+  "openBatterySettings": "Abrir configurações de bateria"
 }

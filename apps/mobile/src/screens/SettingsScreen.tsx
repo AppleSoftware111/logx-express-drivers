@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import type { SupportedLocale } from '@logx/i18n';
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import {
   getNotificationPermissionState,
+  openBatteryOptimizationSettings,
   requestNotificationPermission,
   type NotificationPermissionState,
 } from '../services/gpsService';
@@ -207,6 +209,21 @@ export function SettingsScreen({ onClose }: Props) {
           )}
         </TouchableOpacity>
       </View>
+
+      {Platform.OS === 'android' && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('mobile.batteryOptimization')}</Text>
+          <Text style={styles.helperText}>{t('mobile.batteryOptimizationHint')}</Text>
+          <TouchableOpacity
+            style={styles.settingsActionButton}
+            onPress={() => openBatteryOptimizationSettings()}
+          >
+            <Text style={styles.settingsActionButtonText}>
+              {t('mobile.openBatterySettings')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t('mobile.appInfo')}</Text>

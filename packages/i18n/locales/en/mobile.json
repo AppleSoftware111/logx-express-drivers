@@ -90,5 +90,8 @@
   "offlinePodSubmit": "Proof of delivery is saved locally, but submission requires internet access.",
   "podValidation": "Add a receiver name or capture a photo before completing the stop.",
   "actionQueuedForSync": "Saved on this device. It will sync automatically when the connection is available.",
-  "gpsRequiredToStart": "Enable GPS and grant foreground, background, and notification permission before starting route tracking."
+  "gpsRequiredToStart": "Enable GPS and grant foreground, background, and notification permission before starting route tracking.",
+  "batteryOptimization": "Battery optimization",
+  "batteryOptimizationHint": "Some phones (Xiaomi, Samsung, Motorola, and others) stop tracking when the screen locks. Disable battery optimization for this app to keep GPS active during the route.",
+  "openBatterySettings": "Open battery settings"
 }

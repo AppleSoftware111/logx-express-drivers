@@ -90,5 +90,8 @@
   "offlinePodSubmit": "La prueba de entrega quedó guardada localmente, pero el envío requiere internet.",
   "podValidation": "Agregue el nombre del receptor o capture una foto antes de completar la parada.",
   "actionQueuedForSync": "Guardado en este dispositivo. Se sincronizará automáticamente cuando haya conexión disponible.",
-  "gpsRequiredToStart": "Active el GPS y conceda permisos de ubicación en primer plano, en segundo plano y de notificaciones antes de iniciar el seguimiento de la ruta."
+  "gpsRequiredToStart": "Active el GPS y conceda permisos de ubicación en primer plano, en segundo plano y de notificaciones antes de iniciar el seguimiento de la ruta.",
+  "batteryOptimization": "Optimización de batería",
+  "batteryOptimizationHint": "Algunos celulares (Xiaomi, Samsung, Motorola y otros) detienen el seguimiento cuando se bloquea la pantalla. Desactive la optimización de batería para esta app para mantener el GPS activo durante la ruta.",
+  "openBatterySettings": "Abrir ajustes de batería"
 }

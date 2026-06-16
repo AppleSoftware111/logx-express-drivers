@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
 
@@ -335,6 +335,16 @@ export async function getTrackedExecutionId(): Promise<string | null> {
 
 export async function hasBackgroundGpsStarted(): Promise<boolean> {
   return Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
+}
+
+export function openBatteryOptimizationSettings(): void {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    Linking.sendIntent('android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS');
+  } catch {
+    void Linking.openSettings();
+  }
 }
 
 export async function getCurrentLocation(): Promise<Location.LocationObject | null> {

@@ -5,3 +5,8 @@ npm run build:apk:cloud
 # LDPlayer only
 npm run generate:assets
 npm run build:apk:standalone:ldplayer
+
+
+
+npm run generate:assets
+npm run build:apk:standalone:phone:universal
