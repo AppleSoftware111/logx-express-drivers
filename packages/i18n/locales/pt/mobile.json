@@ -93,5 +93,9 @@
   "gpsRequiredToStart": "Ative o GPS e conceda permissão de localização em primeiro plano, em segundo plano e de notificações antes de iniciar o rastreamento da rota.",
   "batteryOptimization": "Otimização de bateria",
   "batteryOptimizationHint": "Alguns celulares (Xiaomi, Samsung, Motorola e outros) interrompem o rastreamento quando a tela é bloqueada. Desative a otimização de bateria para este app para manter o GPS ativo durante a rota.",
-  "openBatterySettings": "Abrir configurações de bateria"
+  "openBatterySettings": "Permitir bateria sem restrições",
+  "batteryOptimizationPromptTitle": "Mantenha o rastreamento com a tela bloqueada",
+  "batteryOptimizationPromptBody": "Para continuar enviando sua localização com o celular bloqueado, permita que este app funcione sem restrições de bateria. Toque em Permitir na próxima tela.",
+  "batteryOptimizationOpen": "Permitir agora",
+  "batteryOptimizationLater": "Depois"
 }

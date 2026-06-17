@@ -1,9 +1,11 @@
+import * as Application from 'expo-application';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { Linking, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
 
@@ -14,6 +16,7 @@ const GPS_TASK_NAME = 'logx-background-gps';
 const ACTIVE_EXECUTION_STORAGE_KEY = 'activeExecutionId';
 const GPS_QUEUE_STORAGE_KEY = 'gpsPendingQueue';
 const ACCESS_TOKEN_KEY = 'accessToken';
+const BATTERY_PROMPT_STORAGE_KEY = 'batteryOptimizationPromptShown';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
 
@@ -188,7 +191,11 @@ export async function flushQueuedGpsPayloads(): Promise<boolean> {
 export async function activateTrackedExecution(executionId: string): Promise<boolean> {
   setCurrentExecutionId(executionId);
   await AsyncStorage.setItem(ACTIVE_EXECUTION_STORAGE_KEY, executionId);
-  return startBackgroundGps(executionId);
+  const started = await startBackgroundGps(executionId);
+  if (started) {
+    void maybePromptBatteryOptimization();
+  }
+  return started;
 }
 
 export async function ensureTrackedExecutionRunning(executionId: string): Promise<boolean> {
@@ -345,6 +352,49 @@ export function openBatteryOptimizationSettings(): void {
   } catch {
     void Linking.openSettings();
   }
+}
+
+export async function requestIgnoreBatteryOptimizations(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const packageName = Application.applicationId;
+
+  try {
+    if (packageName) {
+      await IntentLauncher.startActivityAsync(
+        IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+        { data: `package:${packageName}` }
+      );
+      return;
+    }
+  } catch {
+    // Some OEMs block the direct dialog; fall back to the battery settings list.
+  }
+
+  openBatteryOptimizationSettings();
+}
+
+export async function maybePromptBatteryOptimization(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const alreadyShown = await AsyncStorage.getItem(BATTERY_PROMPT_STORAGE_KEY);
+  if (alreadyShown === 'true') return;
+
+  await AsyncStorage.setItem(BATTERY_PROMPT_STORAGE_KEY, 'true');
+
+  Alert.alert(
+    i18n.t('mobile.batteryOptimizationPromptTitle'),
+    i18n.t('mobile.batteryOptimizationPromptBody'),
+    [
+      { text: i18n.t('mobile.batteryOptimizationLater'), style: 'cancel' },
+      {
+        text: i18n.t('mobile.batteryOptimizationOpen'),
+        onPress: () => {
+          void requestIgnoreBatteryOptimizations();
+        },
+      },
+    ]
+  );
 }
 
 export async function getCurrentLocation(): Promise<Location.LocationObject | null> {

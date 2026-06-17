@@ -20,7 +20,7 @@ import type { SupportedLocale } from '@logx/i18n';
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import {
   getNotificationPermissionState,
-  openBatteryOptimizationSettings,
+  requestIgnoreBatteryOptimizations,
   requestNotificationPermission,
   type NotificationPermissionState,
 } from '../services/gpsService';
@@ -216,7 +216,7 @@ export function SettingsScreen({ onClose }: Props) {
           <Text style={styles.helperText}>{t('mobile.batteryOptimizationHint')}</Text>
           <TouchableOpacity
             style={styles.settingsActionButton}
-            onPress={() => openBatteryOptimizationSettings()}
+            onPress={() => void requestIgnoreBatteryOptimizations()}
           >
             <Text style={styles.settingsActionButtonText}>
               {t('mobile.openBatterySettings')}
