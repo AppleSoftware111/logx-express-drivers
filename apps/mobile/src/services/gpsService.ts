@@ -4,20 +4,19 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
 
-import { API_URL } from './api';
+import { apiClient } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
 const ACTIVE_EXECUTION_STORAGE_KEY = 'activeExecutionId';
 const GPS_QUEUE_STORAGE_KEY = 'gpsPendingQueue';
-const ACCESS_TOKEN_KEY = 'accessToken';
 const BATTERY_PROMPT_STORAGE_KEY = 'batteryOptimizationPromptShown';
 const LAST_GPS_SENT_STORAGE_KEY = 'lastGpsSentAt';
+const LAST_GPS_RESULT_STORAGE_KEY = 'lastGpsSendResult';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
 
@@ -50,6 +49,25 @@ async function markGpsSentNow(): Promise<void> {
 
 export async function getLastGpsSentAt(): Promise<string | null> {
   return AsyncStorage.getItem(LAST_GPS_SENT_STORAGE_KEY);
+}
+
+async function setLastGpsSendResult(result: string): Promise<void> {
+  await AsyncStorage.setItem(LAST_GPS_RESULT_STORAGE_KEY, result);
+}
+
+export async function getLastGpsSendResult(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_GPS_RESULT_STORAGE_KEY);
+}
+
+function describeGpsSendError(error: unknown): string {
+  const err = error as { response?: { status?: number }; code?: string };
+  if (typeof err.response?.status === 'number') {
+    return `http_${err.response.status}`;
+  }
+  if (err.code) {
+    return err.code;
+  }
+  return 'network_error';
 }
 
 function requiresNotificationPermission(): boolean {
@@ -158,27 +176,16 @@ function toGpsPayload(
 async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   if (!payloads.length) return true;
 
-  const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-  if (!accessToken) {
-    return false;
-  }
-
+  // Use the shared axios client so background uploads inherit the single-flight
+  // token refresh: a 15-min access token expiring while the screen is locked
+  // otherwise causes silent 401s and "only updates when I open the app".
   try {
-    const response = await fetch(`${API_URL}/api/tracking/location`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ points: payloads }),
-    });
-
-    if (response.ok) {
-      await markGpsSentNow();
-    }
-
-    return response.ok;
-  } catch {
+    await apiClient.post('/tracking/location', { points: payloads });
+    await markGpsSentNow();
+    await setLastGpsSendResult('ok');
+    return true;
+  } catch (error) {
+    await setLastGpsSendResult(describeGpsSendError(error));
     return false;
   }
 }

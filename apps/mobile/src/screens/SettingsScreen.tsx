@@ -19,6 +19,7 @@ import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import {
+  getLastGpsSendResult,
   getLastGpsSentAt,
   getNotificationPermissionState,
   hasBackgroundGpsStarted,
@@ -49,14 +50,16 @@ export function SettingsScreen({ onClose }: Props) {
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
   const [trackingActive, setTrackingActive] = useState(false);
   const [lastGpsSentAt, setLastGpsSentAt] = useState<string | null>(null);
+  const [lastGpsResult, setLastGpsResult] = useState<string | null>(null);
 
   const refreshPermissions = async () => {
-    const [foreground, background, notifications, tracking, lastSent] = await Promise.all([
+    const [foreground, background, notifications, tracking, lastSent, lastResult] = await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
       getNotificationPermissionState(),
       hasBackgroundGpsStarted(),
       getLastGpsSentAt(),
+      getLastGpsSendResult(),
     ]);
 
     setForegroundPermission(foreground.status);
@@ -64,7 +67,17 @@ export function SettingsScreen({ onClose }: Props) {
     setNotificationPermission(notifications);
     setTrackingActive(tracking);
     setLastGpsSentAt(lastSent);
+    setLastGpsResult(lastResult);
   };
+
+  const lastGpsResultLabel = (() => {
+    if (!lastGpsResult) return t('mobile.trackingNeverSent');
+    if (lastGpsResult === 'ok') return t('mobile.trackingSendOk');
+    if (lastGpsResult === 'http_401' || lastGpsResult === 'http_403') {
+      return t('mobile.trackingSendAuth');
+    }
+    return t('mobile.trackingSendFailed', { code: lastGpsResult });
+  })();
 
   useEffect(() => {
     void (async () => {
@@ -243,6 +256,7 @@ export function SettingsScreen({ onClose }: Props) {
           label={t('mobile.lastLocationSent')}
           value={lastGpsSentAt ? formatTimeByLocale(lastGpsSentAt, locale) : t('mobile.trackingNeverSent')}
         />
+        <InfoRow label={t('mobile.lastSendResult')} value={lastGpsResultLabel} />
         <Text style={styles.helperText}>{t('mobile.trackingDiagnosticsHint')}</Text>
         <TouchableOpacity style={styles.settingsActionButton} onPress={() => void refreshPermissions()}>
           <Text style={styles.settingsActionButtonText}>{t('mobile.refreshDiagnostics')}</Text>

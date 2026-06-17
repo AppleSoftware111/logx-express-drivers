@@ -104,6 +104,10 @@
   "trackingInactiveLabel": "Inactive",
   "lastLocationSent": "Last location sent",
   "trackingNeverSent": "Not sent yet",
+  "lastSendResult": "Last upload result",
+  "trackingSendOk": "Success",
+  "trackingSendAuth": "Session expired — reopen the app to sign in again",
+  "trackingSendFailed": "Failed ({code})",
   "trackingDiagnosticsHint": "Shows whether the GPS service is running and when the last location reached the server. Use this to check tracking on this device.",
   "refreshDiagnostics": "Refresh"
 }
