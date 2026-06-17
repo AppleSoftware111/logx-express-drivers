@@ -17,6 +17,7 @@ const ACTIVE_EXECUTION_STORAGE_KEY = 'activeExecutionId';
 const GPS_QUEUE_STORAGE_KEY = 'gpsPendingQueue';
 const ACCESS_TOKEN_KEY = 'accessToken';
 const BATTERY_PROMPT_STORAGE_KEY = 'batteryOptimizationPromptShown';
+const LAST_GPS_SENT_STORAGE_KEY = 'lastGpsSentAt';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
 
@@ -39,8 +40,17 @@ export interface GpsReadiness {
 }
 
 let currentExecutionId: string | null = null;
+let foregroundWatch: Location.LocationSubscription | null = null;
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'undetermined';
+
+async function markGpsSentNow(): Promise<void> {
+  await AsyncStorage.setItem(LAST_GPS_SENT_STORAGE_KEY, new Date().toISOString());
+}
+
+export async function getLastGpsSentAt(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_GPS_SENT_STORAGE_KEY);
+}
 
 function requiresNotificationPermission(): boolean {
   return Platform.OS === 'android' && Number(Platform.Version) >= 33;
@@ -162,6 +172,10 @@ async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
       },
       body: JSON.stringify({ points: payloads }),
     });
+
+    if (response.ok) {
+      await markGpsSentNow();
+    }
 
     return response.ok;
   } catch {
@@ -329,6 +343,7 @@ export async function startBackgroundGps(executionId: string): Promise<boolean> 
 export async function stopBackgroundGps(): Promise<void> {
   setCurrentExecutionId(null);
   await AsyncStorage.removeItem(ACTIVE_EXECUTION_STORAGE_KEY);
+  stopForegroundLocationStream();
 
   const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
   if (isRunning) {
@@ -404,5 +419,50 @@ export async function getCurrentLocation(): Promise<Location.LocationObject | nu
     });
   } catch {
     return null;
+  }
+}
+
+async function enqueueAndFlushLocation(
+  executionId: string,
+  location: Location.LocationObject
+): Promise<void> {
+  await appendQueuedGpsPayloads([toGpsPayload(executionId, location)]);
+  await flushQueuedGpsPayloads();
+}
+
+/**
+ * Foreground location stream. While the app is open this guarantees continuous
+ * updates even if the OS throttles the background foreground-service task.
+ */
+export async function startForegroundLocationStream(executionId: string): Promise<void> {
+  if (foregroundWatch) return;
+
+  const { status } = await Location.getForegroundPermissionsAsync();
+  if (status !== 'granted') return;
+
+  setCurrentExecutionId(executionId);
+
+  foregroundWatch = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.BestForNavigation,
+      timeInterval: GPS_EMIT_INTERVAL_MS,
+      distanceInterval: 10,
+    },
+    (location) => {
+      void enqueueAndFlushLocation(executionId, location);
+    }
+  );
+}
+
+export async function ensureForegroundLocationStream(): Promise<void> {
+  const executionId = currentExecutionId ?? (await getPersistedExecutionId());
+  if (!executionId) return;
+  await startForegroundLocationStream(executionId);
+}
+
+export function stopForegroundLocationStream(): void {
+  if (foregroundWatch) {
+    foregroundWatch.remove();
+    foregroundWatch = null;
   }
 }

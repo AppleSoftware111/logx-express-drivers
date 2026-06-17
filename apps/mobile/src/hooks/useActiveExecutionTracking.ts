@@ -5,11 +5,13 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../services/api';
 import {
   activateTrackedExecution,
+  ensureForegroundLocationStream,
   ensureTrackedExecutionRunning,
   flushQueuedGpsPayloads,
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
   stopBackgroundGps,
+  stopForegroundLocationStream,
 } from '../services/gpsService';
 import { flushWorkflowOutbox } from '../services/routeWorkflowService';
 import { useAuthStore } from '../stores/authStore';
@@ -64,6 +66,7 @@ export function useActiveExecutionTracking() {
 
       if (!trackedExecutionId && inProgressExecution) {
         await activateTrackedExecution(inProgressExecution._id);
+        await ensureForegroundLocationStream();
         return;
       }
 
@@ -72,6 +75,7 @@ export function useActiveExecutionTracking() {
         if (!isRunning) {
           await ensureTrackedExecutionRunning(trackedExecutionId);
         }
+        await ensureForegroundLocationStream();
       }
     };
 
@@ -81,10 +85,14 @@ export function useActiveExecutionTracking() {
     };
 
     const handleAppStateChange = (nextState: string) => {
-      if (nextState !== 'active') return;
+      if (nextState === 'active') {
+        void ensureTrackingState();
+        void flushQueue();
+        return;
+      }
 
-      void ensureTrackingState();
-      void flushQueue();
+      // App is backgrounded/locked: hand off to the OS foreground-service task.
+      stopForegroundLocationStream();
     };
 
     void ensureTrackingState();

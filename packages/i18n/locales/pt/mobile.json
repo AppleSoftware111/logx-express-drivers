@@ -97,5 +97,13 @@
   "batteryOptimizationPromptTitle": "Mantenha o rastreamento com a tela bloqueada",
   "batteryOptimizationPromptBody": "Para continuar enviando sua localização com o celular bloqueado, permita que este app funcione sem restrições de bateria. Toque em Permitir na próxima tela.",
   "batteryOptimizationOpen": "Permitir agora",
-  "batteryOptimizationLater": "Depois"
+  "batteryOptimizationLater": "Depois",
+  "trackingDiagnostics": "Diagnóstico de rastreamento",
+  "trackingStatus": "Serviço de rastreamento",
+  "trackingActiveLabel": "Ativo",
+  "trackingInactiveLabel": "Inativo",
+  "lastLocationSent": "Última localização enviada",
+  "trackingNeverSent": "Ainda não enviada",
+  "trackingDiagnosticsHint": "Mostra se o serviço de GPS está ativo e quando a última localização chegou ao servidor. Use para verificar o rastreamento neste aparelho.",
+  "refreshDiagnostics": "Atualizar"
 }

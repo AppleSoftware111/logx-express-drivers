@@ -97,5 +97,13 @@
   "batteryOptimizationPromptTitle": "Keep tracking while the screen is locked",
   "batteryOptimizationPromptBody": "To keep sending your location when the phone is locked, allow this app to run without battery restrictions. Tap Allow on the next screen.",
   "batteryOptimizationOpen": "Allow now",
-  "batteryOptimizationLater": "Later"
+  "batteryOptimizationLater": "Later",
+  "trackingDiagnostics": "Tracking diagnostics",
+  "trackingStatus": "Tracking service",
+  "trackingActiveLabel": "Active",
+  "trackingInactiveLabel": "Inactive",
+  "lastLocationSent": "Last location sent",
+  "trackingNeverSent": "Not sent yet",
+  "trackingDiagnosticsHint": "Shows whether the GPS service is running and when the last location reached the server. Use this to check tracking on this device.",
+  "refreshDiagnostics": "Refresh"
 }
