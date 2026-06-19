@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
-import { apiClient } from '../services/api';
+import { apiClient, ensureFreshToken } from '../services/api';
 import {
   activateTrackedExecution,
   ensureForegroundLocationStream,
@@ -46,6 +46,9 @@ export function useActiveExecutionTracking() {
     }
 
     const ensureTrackingState = async () => {
+      const tokenValid = await ensureFreshToken();
+      if (!tokenValid) return;
+
       const trackedExecutionId = await getTrackedExecutionId();
       const trackedExecution = trackedExecutionId
         ? todayExecutions?.find((execution) => execution._id === trackedExecutionId)

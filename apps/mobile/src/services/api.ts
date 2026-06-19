@@ -128,6 +128,51 @@ export function isDefinitiveAuthFailure(error: unknown): boolean {
   return err.response?.status === 401 || err.response?.status === 403;
 }
 
+/**
+ * Decode the expiry of a JWT without verifying its signature.
+ * Returns the `exp` Unix timestamp in milliseconds, or 0 on failure.
+ */
+function jwtExpiresAtMs(token: string): number {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return 0;
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
+      exp?: number;
+    };
+    return typeof decoded.exp === 'number' ? decoded.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Ensures there is a valid (non-expired) access token in SecureStore.
+ * Refreshes proactively when the token has less than 90 seconds of life left.
+ * Safe to call from background task contexts where the interceptor may not fire.
+ */
+export async function ensureFreshToken(): Promise<boolean> {
+  try {
+    const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+    if (!token) {
+      await refreshAuthSession();
+      return true;
+    }
+    const expiresAt = jwtExpiresAtMs(token);
+    const msLeft = expiresAt - Date.now();
+    if (msLeft < 90_000) {
+      await refreshAuthSession();
+    }
+    return true;
+  } catch (error) {
+    if (!isRecoverableNetworkError(error)) {
+      await clearAuthSession();
+      useAuthStore.getState().logout();
+      await authFailureHandler?.();
+    }
+    return false;
+  }
+}
+
 async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken: string }> {
   if (refreshRequestPromise) {
     return refreshRequestPromise;

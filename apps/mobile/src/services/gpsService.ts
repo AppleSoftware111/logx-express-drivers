@@ -8,7 +8,7 @@ import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
 
-import { apiClient } from './api';
+import { apiClient, ensureFreshToken } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
@@ -49,6 +49,11 @@ async function markGpsSentNow(): Promise<void> {
 
 export async function getLastGpsSentAt(): Promise<string | null> {
   return AsyncStorage.getItem(LAST_GPS_SENT_STORAGE_KEY);
+}
+
+/** Call on logout so diagnostics don't show stale results from the previous session. */
+export async function clearGpsDiagnostics(): Promise<void> {
+  await AsyncStorage.multiRemove([LAST_GPS_SENT_STORAGE_KEY, LAST_GPS_RESULT_STORAGE_KEY]);
 }
 
 async function setLastGpsSendResult(result: string): Promise<void> {
@@ -176,9 +181,15 @@ function toGpsPayload(
 async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   if (!payloads.length) return true;
 
-  // Use the shared axios client so background uploads inherit the single-flight
-  // token refresh: a 15-min access token expiring while the screen is locked
-  // otherwise causes silent 401s and "only updates when I open the app".
+  // Proactively refresh the access token when it has < 90 s of life left.
+  // This is critical for background task context where the axios interceptor
+  // may not trigger: without this, a 15-min token expiry silently kills uploads.
+  const tokenOk = await ensureFreshToken();
+  if (!tokenOk) {
+    await setLastGpsSendResult('http_401');
+    return false;
+  }
+
   try {
     await apiClient.post('/tracking/location', { points: payloads });
     await markGpsSentNow();

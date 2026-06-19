@@ -19,6 +19,7 @@ import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import {
+  clearGpsDiagnostics,
   getLastGpsSendResult,
   getLastGpsSentAt,
   getNotificationPermissionState,
@@ -108,6 +109,7 @@ export function SettingsScreen({ onClose }: Props) {
       // Ignore network/logout endpoint failures and clear the local session anyway.
     } finally {
       await clearAuthSession();
+      await clearGpsDiagnostics();
       logout();
       setIsLoggingOut(false);
     }

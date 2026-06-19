@@ -277,10 +277,10 @@ export async function listExecutions(
 export async function getTodayExecutions(companyId: string, driverId?: string) {
   const today = getCurrentBusinessDate();
 
-  const query: Record<string, unknown> = { companyId, scheduledDate: today };
-  if (driverId) query.driverId = driverId;
+  const todayQuery: Record<string, unknown> = { companyId, scheduledDate: today };
+  if (driverId) todayQuery.driverId = driverId;
 
-  return RouteExecution.find(query)
+  const todayResults = await RouteExecution.find(todayQuery)
     .select('-__v')
     .populate('routeId', 'name scheduledTime')
     .populate('contractId', 'clientId slaMinutes')
@@ -288,6 +288,34 @@ export async function getTodayExecutions(companyId: string, driverId?: string) {
     .populate('stops.clientId', 'name address location type')
     .lean()
     .sort({ scheduledTime: 1 });
+
+  // Also include any IN_PROGRESS execution from a previous day so a driver
+  // who started a route yesterday (or earlier) is still tracked after a login.
+  if (driverId) {
+    const activeQuery = {
+      companyId,
+      driverId,
+      status: 'IN_PROGRESS',
+      scheduledDate: { $lt: today },
+    };
+    const activeFromPriorDays = await RouteExecution.find(activeQuery)
+      .select('-__v')
+      .populate('routeId', 'name scheduledTime')
+      .populate('contractId', 'clientId slaMinutes')
+      .populate('driverId', 'name phone vehicleId isOnline currentLocation')
+      .populate('stops.clientId', 'name address location type')
+      .lean();
+
+    // Merge without duplicates (by id string comparison).
+    const todayIds = new Set(todayResults.map((e) => String(e._id)));
+    for (const e of activeFromPriorDays) {
+      if (!todayIds.has(String(e._id))) {
+        todayResults.unshift(e);
+      }
+    }
+  }
+
+  return todayResults;
 }
 
 export async function getExecution(companyId: string, executionId: string) {
