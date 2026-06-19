@@ -28,6 +28,7 @@ import {
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { useDriverRealtime } from './src/hooks/useDriverRealtime';
 import { useActiveExecutionTracking } from './src/hooks/useActiveExecutionTracking';
+import { clearGpsDiagnostics } from './src/services/gpsService';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,6 +129,7 @@ function AppContent() {
 
           await persistStoredUser(normalizedUser);
           setAuth(normalizedUser, latestSession.accessToken ?? session.accessToken ?? '', latestSession.refreshToken ?? session.refreshToken);
+          await clearGpsDiagnostics();
         }
         setBootstrapError(null);
       } catch (error) {
