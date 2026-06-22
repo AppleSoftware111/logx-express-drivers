@@ -190,8 +190,11 @@ export function SettingsScreen({ onClose }: Props) {
   const lastGpsResultLabel = (() => {
     if (!lastGpsResult) return t('mobile.trackingNeverSent');
     if (lastGpsResult === 'ok') return t('mobile.trackingSendOk');
-    if (lastGpsResult === 'http_401' || lastGpsResult === 'http_403') {
+    if (lastGpsResult === 'http_401') {
       return t('mobile.trackingSendAuth');
+    }
+    if (lastGpsResult === 'http_403') {
+      return t('mobile.trackingSendForbidden');
     }
     return t('mobile.trackingSendFailed', { code: lastGpsResult });
   })();

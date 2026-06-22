@@ -111,6 +111,7 @@
   "lastSendResult": "Resultado del último envío",
   "trackingSendOk": "Correcto",
   "trackingSendAuth": "Sesión expirada — vuelva a abrir la app para iniciar sesión",
+  "trackingSendForbidden": "Cuenta de conductor no vinculada — cierre sesión y vuelva a entrar tras actualizar la app",
   "trackingSendFailed": "Falló ({code})",
   "trackingDiagnosticsHint": "Muestra si el servicio de GPS está activo y cuándo llegó la última ubicación al servidor. Úselo para verificar el seguimiento en este dispositivo.",
   "refreshDiagnostics": "Actualizar",

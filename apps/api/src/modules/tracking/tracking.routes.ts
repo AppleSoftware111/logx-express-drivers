@@ -11,6 +11,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { sendSuccess } from '../../utils/apiResponse';
 import { emitDriverLocationUpdate, emitExecutionRealtimeUpdate } from '../../socket/realtime';
 import { getOnlineDrivers, processDriverGpsPayload, updateDriverLocation } from './tracking.service';
+import { resolveDriverIdByUserId } from '../../utils/resolveDriverId';
 
 const router = Router();
 const driverTrackedLocationSchema = gpsPointSchema.omit({ driverId: true });
@@ -39,17 +40,22 @@ router.get(
 router.post(
   '/location',
   asyncHandler(async (req: Request, res: Response) => {
-    if (!req.user?.driverId) {
+    const driverId = await resolveDriverIdByUserId(
+      req.user!.userId,
+      req.user!.role,
+      req.user!.driverId
+    );
+    if (!driverId) {
       throw new AppError(ApiErrorCode.FORBIDDEN, 403);
     }
 
     const { points } = trackedLocationBatchSchema.parse(req.body);
 
     for (const point of points) {
-      const arrival = await processDriverGpsPayload(req.user.companyId, req.user.driverId, point);
+      const arrival = await processDriverGpsPayload(req.user!.companyId, driverId, point);
 
-      emitDriverLocationUpdate(req.user.companyId, {
-        driverId: req.user.driverId,
+      emitDriverLocationUpdate(req.user!.companyId, {
+        driverId,
         executionId: point.executionId,
         lat: point.lat,
         lng: point.lng,
@@ -60,12 +66,12 @@ router.post(
       });
 
       if (arrival) {
-        emitExecutionRealtimeUpdate(req.user.companyId, {
+        emitExecutionRealtimeUpdate(req.user!.companyId, {
           executionId: arrival.executionId,
           event: 'STOP_ARRIVED',
           stopId: arrival.stopId,
           clientName: arrival.clientName,
-          driverId: req.user.driverId,
+          driverId,
           timestamp: new Date().toISOString(),
         });
       }
@@ -78,15 +84,20 @@ router.post(
 router.post(
   '/presence',
   asyncHandler(async (req: Request, res: Response) => {
-    if (!req.user?.driverId) {
+    const driverId = await resolveDriverIdByUserId(
+      req.user!.userId,
+      req.user!.role,
+      req.user!.driverId
+    );
+    if (!driverId) {
       throw new AppError(ApiErrorCode.FORBIDDEN, 403);
     }
 
     const payload = presenceLocationSchema.parse(req.body);
-    await updateDriverLocation(req.user.driverId, payload.lat, payload.lng);
+    await updateDriverLocation(driverId, payload.lat, payload.lng);
 
-    emitDriverLocationUpdate(req.user.companyId, {
-      driverId: req.user.driverId,
+    emitDriverLocationUpdate(req.user!.companyId, {
+      driverId,
       lat: payload.lat,
       lng: payload.lng,
       speed: payload.speed,

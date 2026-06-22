@@ -10,7 +10,9 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  type JwtPayload,
 } from '../../utils/jwtHelpers';
+import { resolveDriverIdForUser } from '../../utils/resolveDriverId';
 
 export interface AuthTokens {
   accessToken: string;
@@ -33,6 +35,24 @@ export interface UpdateUserPreferencesInput {
   locale?: SupportedLocale;
 }
 
+async function buildTokenPayload(user: {
+  _id: { toString(): string };
+  companyId?: { toString(): string } | null;
+  role: string;
+  driverId?: { toString(): string } | null;
+  clientId?: { toString(): string } | null;
+}): Promise<JwtPayload> {
+  const driverId = await resolveDriverIdForUser(user);
+
+  return {
+    userId: user._id.toString(),
+    companyId: user.companyId?.toString() ?? '',
+    role: user.role,
+    driverId,
+    clientId: user.clientId?.toString(),
+  };
+}
+
 export async function loginService(
   email: string,
   password: string,
@@ -51,13 +71,7 @@ export async function loginService(
     throw new AppError(ApiErrorCode.AUTH_INVALID_CREDENTIALS, 401);
   }
 
-  const tokenPayload = {
-    userId: user._id.toString(),
-    companyId: user.companyId?.toString() ?? '',
-    role: user.role,
-    driverId: user.driverId?.toString(),
-    clientId: user.clientId?.toString(),
-  };
+  const tokenPayload = await buildTokenPayload(user);
 
   const accessToken = signAccessToken(tokenPayload);
   const refreshToken = signRefreshToken(tokenPayload);
@@ -83,7 +97,7 @@ export async function loginService(
       role: user.role,
       locale: locale ?? user.locale,
       companyId: user.companyId?.toString(),
-      driverId: user.driverId?.toString(),
+      driverId: tokenPayload.driverId,
       clientId: user.clientId?.toString(),
     },
   };
@@ -114,13 +128,7 @@ export async function refreshTokenService(
     throw new AppError(ApiErrorCode.AUTH_REFRESH_REUSE, 401);
   }
 
-  const newTokenPayload = {
-    userId: user._id.toString(),
-    companyId: user.companyId?.toString() ?? '',
-    role: user.role,
-    driverId: user.driverId?.toString(),
-    clientId: user.clientId?.toString(),
-  };
+  const newTokenPayload = await buildTokenPayload(user);
 
   const newAccessToken = signAccessToken(newTokenPayload);
   const newRefreshToken = signRefreshToken(newTokenPayload);

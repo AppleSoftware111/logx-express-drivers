@@ -111,6 +111,7 @@
   "lastSendResult": "Last upload result",
   "trackingSendOk": "Success",
   "trackingSendAuth": "Session expired — reopen the app to sign in again",
+  "trackingSendForbidden": "Driver account not linked — log out and sign in again after updating the app",
   "trackingSendFailed": "Failed ({code})",
   "trackingDiagnosticsHint": "Shows whether the GPS service is running and when the last location reached the server. Use this to check tracking on this device.",
   "refreshDiagnostics": "Refresh",
