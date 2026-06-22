@@ -2,7 +2,7 @@
   "expo": {
     "name": "LOGX BioPoli",
     "slug": "logx-express-driver",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -28,7 +28,7 @@
         "backgroundColor": "#1d4ed8"
       },
       "package": "com.logxbiopoli.driver",
-      "versionCode": 10003,
+      "versionCode": 10004,
       "permissions": [
         "POST_NOTIFICATIONS",
         "ACCESS_FINE_LOCATION",

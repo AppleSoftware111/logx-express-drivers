@@ -32,6 +32,8 @@ import {
   getLastGpsTaskError,
   getLastGpsTaskFiredAt,
   getQueuedGpsPayloadCount,
+  renormalizeQueuedGpsPayloads,
+  flushQueuedGpsPayloads,
   reconcileStaleGpsSendResult,
   requestRequiredLocationPermissions,
   startPresenceGps,
@@ -155,6 +157,8 @@ export function SettingsScreen({ onClose }: Props) {
     }
 
     await ensureForegroundLocationStream();
+    await renormalizeQueuedGpsPayloads();
+    await flushQueuedGpsPayloads();
     return null;
   };
 

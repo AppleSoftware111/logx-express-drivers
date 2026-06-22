@@ -250,11 +250,45 @@ export function setCurrentExecutionId(id: string | null): void {
   currentExecutionId = id;
 }
 
+function sanitizeGpsMetric(
+  value: number | null | undefined,
+  min: number,
+  max?: number
+): number | undefined {
+  if (value == null || !Number.isFinite(value) || value < min) {
+    return undefined;
+  }
+  if (max != null && value > max) {
+    return undefined;
+  }
+  return value;
+}
+
+function sanitizeGpsPayload(payload: GpsPayload): GpsPayload {
+  return {
+    ...payload,
+    speed: sanitizeGpsMetric(payload.speed, 0),
+    heading: sanitizeGpsMetric(payload.heading, 0, 360),
+    accuracy: sanitizeGpsMetric(payload.accuracy, 0),
+  };
+}
+
+function presencePayloadFromLocation(location: Location.LocationObject) {
+  return {
+    lat: location.coords.latitude,
+    lng: location.coords.longitude,
+    speed: sanitizeGpsMetric(location.coords.speed, 0),
+    heading: sanitizeGpsMetric(location.coords.heading, 0, 360),
+    accuracy: sanitizeGpsMetric(location.coords.accuracy, 0),
+    recordedAt: new Date(location.timestamp).toISOString(),
+  };
+}
+
 function toGpsPayload(
   executionId: string,
   location: Location.LocationObject
 ): GpsPayload {
-  return {
+  return sanitizeGpsPayload({
     executionId,
     lat: location.coords.latitude,
     lng: location.coords.longitude,
@@ -262,7 +296,16 @@ function toGpsPayload(
     heading: location.coords.heading ?? undefined,
     accuracy: location.coords.accuracy ?? undefined,
     recordedAt: new Date(location.timestamp).toISOString(),
-  };
+  });
+}
+
+/** Re-sanitize any points already in the offline queue (e.g. after an app update). */
+export async function renormalizeQueuedGpsPayloads(): Promise<number> {
+  const queued = await readQueuedGpsPayloads();
+  if (!queued.length) return 0;
+  const sanitized = queued.map(sanitizeGpsPayload);
+  await writeQueuedGpsPayloads(sanitized);
+  return sanitized.length;
 }
 
 async function submitPresenceLocation(location: Location.LocationObject): Promise<boolean> {
@@ -273,18 +316,9 @@ async function submitPresenceLocation(location: Location.LocationObject): Promis
   }
 
   try {
-    await apiClient.post(
-      '/tracking/presence',
-      {
-        lat: location.coords.latitude,
-        lng: location.coords.longitude,
-        speed: location.coords.speed ?? undefined,
-        heading: location.coords.heading ?? undefined,
-        accuracy: location.coords.accuracy ?? undefined,
-        recordedAt: new Date(location.timestamp).toISOString(),
-      },
-      { timeout: UPLOAD_REQUEST_TIMEOUT_MS }
-    );
+    await apiClient.post('/tracking/presence', presencePayloadFromLocation(location), {
+      timeout: UPLOAD_REQUEST_TIMEOUT_MS,
+    });
     await markGpsSentNow();
     await setLastGpsSendResult('ok');
     return true;
@@ -297,6 +331,8 @@ async function submitPresenceLocation(location: Location.LocationObject): Promis
 async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   if (!payloads.length) return true;
 
+  const sanitized = payloads.map(sanitizeGpsPayload);
+
   const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
   if (!tokenOk) {
     await setLastGpsSendResult('http_401');
@@ -306,14 +342,28 @@ async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   try {
     await apiClient.post(
       '/tracking/location',
-      { points: payloads },
+      { points: sanitized },
       { timeout: UPLOAD_REQUEST_TIMEOUT_MS }
     );
     await markGpsSentNow();
     await setLastGpsSendResult('ok');
     return true;
   } catch (error) {
-    await setLastGpsSendResult(describeGpsSendError(error));
+    const errorCode = describeGpsSendError(error);
+
+    if (errorCode === 'http_400' && sanitized.length > 1) {
+      let accepted = 0;
+      for (const point of sanitized) {
+        if (await submitGpsPayloadBatch([point])) {
+          accepted += 1;
+        }
+      }
+      if (accepted > 0) {
+        return true;
+      }
+    }
+
+    await setLastGpsSendResult(errorCode);
     return false;
   }
 }
@@ -322,7 +372,7 @@ export async function flushQueuedGpsPayloads(): Promise<boolean> {
   const queuedPayloads = await readQueuedGpsPayloads();
   if (!queuedPayloads.length) return true;
 
-  const batch = queuedPayloads.slice(0, GPS_BATCH_SIZE);
+  const batch = queuedPayloads.slice(0, GPS_BATCH_SIZE).map(sanitizeGpsPayload);
   const delivered = await submitGpsPayloadBatch(batch);
   if (!delivered) {
     return false;
@@ -391,13 +441,15 @@ TaskManager.defineTask(
         await appendQueuedGpsPayloads(payloads);
         const flushed = await flushQueuedGpsPayloads();
         if (!flushed) {
-          await markGpsTaskError('upload_failed');
+          const lastResult = await getLastGpsSendResult();
+          await markGpsTaskError(lastResult ?? 'upload_failed');
         }
       } else if (mode === 'presence') {
         const latest = data.locations[data.locations.length - 1];
         const sent = await submitPresenceLocation(latest);
         if (!sent) {
-          await markGpsTaskError('upload_failed');
+          const lastResult = await getLastGpsSendResult();
+          await markGpsTaskError(lastResult ?? 'upload_failed');
         }
       }
     } catch (taskError) {
