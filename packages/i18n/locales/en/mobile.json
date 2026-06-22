@@ -120,5 +120,10 @@
   "trackingRestartAuth": "Could not refresh your session. Close Settings, reopen the app, and sign in again.",
   "trackingRestartPermissions": "Location is not fully granted. Tap Enable location above and choose Always.",
   "trackingRestartFailed": "Could not restart the tracking service. Check permissions and try again.",
-  "trackingRestartTimeout": "Restart took too long. Check that location is set to Always and try again."
+  "trackingRestartTimeout": "Restart took too long. Check that location is set to Always and try again.",
+  "lastBackgroundGpsEvent": "Last background GPS event",
+  "trackingNeverReceived": "Never received",
+  "gpsQueueDepth": "Pending uploads",
+  "gpsQueueDepthValue": "{count} queued",
+  "lastBackgroundGpsError": "Background task error: {error}"
 }

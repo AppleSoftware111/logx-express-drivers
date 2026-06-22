@@ -120,5 +120,10 @@
   "trackingRestartAuth": "Não foi possível renovar sua sessão. Feche Configurações, reabra o app e entre novamente.",
   "trackingRestartPermissions": "A localização não está totalmente permitida. Toque em Ativar localização acima e escolha Sempre.",
   "trackingRestartFailed": "Não foi possível reiniciar o serviço de rastreamento. Verifique as permissões e tente novamente.",
-  "trackingRestartTimeout": "A reinicialização demorou demais. Confira se a localização está em Sempre e tente novamente."
+  "trackingRestartTimeout": "A reinicialização demorou demais. Confira se a localização está em Sempre e tente novamente.",
+  "lastBackgroundGpsEvent": "Último evento GPS em segundo plano",
+  "trackingNeverReceived": "Nunca recebido",
+  "gpsQueueDepth": "Envios pendentes",
+  "gpsQueueDepthValue": "{count} na fila",
+  "lastBackgroundGpsError": "Erro da tarefa em segundo plano: {error}"
 }

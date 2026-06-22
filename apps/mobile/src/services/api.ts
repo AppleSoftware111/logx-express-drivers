@@ -155,13 +155,25 @@ export async function ensureFreshToken(options?: { logoutOnFailure?: boolean }):
   try {
     const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
     if (!token) {
+      if (backgroundTaskContext) {
+        return false;
+      }
       await refreshAuthSession();
       return true;
     }
+
     const expiresAt = jwtExpiresAtMs(token);
     const msLeft = expiresAt - Date.now();
     if (msLeft < 90_000) {
-      await refreshAuthSession();
+      try {
+        await refreshAuthSession();
+      } catch (refreshError) {
+        // In background, keep using the current access token if it has not expired yet.
+        if (backgroundTaskContext && msLeft > 0) {
+          return true;
+        }
+        throw refreshError;
+      }
     }
     return true;
   } catch (error) {

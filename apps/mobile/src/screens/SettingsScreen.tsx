@@ -28,6 +28,10 @@ import {
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
   ensureTrackedExecutionRunning,
+  ensureForegroundLocationStream,
+  getLastGpsTaskError,
+  getLastGpsTaskFiredAt,
+  getQueuedGpsPayloadCount,
   reconcileStaleGpsSendResult,
   requestRequiredLocationPermissions,
   startPresenceGps,
@@ -80,19 +84,26 @@ export function SettingsScreen({ onClose }: Props) {
   const [trackingMode, setTrackingMode] = useState<GpsTrackingMode>('off');
   const [lastGpsSentAt, setLastGpsSentAt] = useState<string | null>(null);
   const [lastGpsResult, setLastGpsResult] = useState<string | null>(null);
+  const [lastGpsTaskFiredAt, setLastGpsTaskFiredAt] = useState<string | null>(null);
+  const [lastGpsTaskError, setLastGpsTaskError] = useState<string | null>(null);
+  const [gpsQueueDepth, setGpsQueueDepth] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState<TrackingRestartError | null>(null);
 
   const readDiagnostics = async () => {
     await reconcileStaleGpsSendResult();
 
-    const [foreground, background, notifications, mode, lastSent, lastResult] = await Promise.all([
+    const [foreground, background, notifications, mode, lastSent, lastResult, taskFired, taskError, queueDepth] =
+      await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
       getNotificationPermissionState(),
       getGpsTrackingMode(),
       getLastGpsSentAt(),
       getLastGpsSendResult(),
+      getLastGpsTaskFiredAt(),
+      getLastGpsTaskError(),
+      getQueuedGpsPayloadCount(),
     ]);
 
     setForegroundPermission(foreground.status);
@@ -101,6 +112,9 @@ export function SettingsScreen({ onClose }: Props) {
     setTrackingMode(mode);
     setLastGpsSentAt(lastSent);
     setLastGpsResult(lastResult);
+    setLastGpsTaskFiredAt(taskFired);
+    setLastGpsTaskError(taskError);
+    setGpsQueueDepth(queueDepth);
   };
 
   const ensureTrackingServiceRunning = async (): Promise<TrackingRestartError | null> => {
@@ -140,6 +154,7 @@ export function SettingsScreen({ onClose }: Props) {
       return 'failed';
     }
 
+    await ensureForegroundLocationStream();
     return null;
   };
 
@@ -438,6 +453,23 @@ export function SettingsScreen({ onClose }: Props) {
           value={lastGpsSentAt ? formatTimeByLocale(lastGpsSentAt, locale) : t('mobile.trackingNeverSent')}
         />
         <InfoRow label={t('mobile.lastSendResult')} value={lastGpsResultLabel} />
+        <InfoRow
+          label={t('mobile.lastBackgroundGpsEvent')}
+          value={
+            lastGpsTaskFiredAt
+              ? formatTimeByLocale(lastGpsTaskFiredAt, locale)
+              : t('mobile.trackingNeverReceived')
+          }
+        />
+        <InfoRow
+          label={t('mobile.gpsQueueDepth')}
+          value={t('mobile.gpsQueueDepthValue', { count: gpsQueueDepth })}
+        />
+        {lastGpsTaskError ? (
+          <Text style={styles.diagnosticErrorText}>
+            {t('mobile.lastBackgroundGpsError', { error: lastGpsTaskError })}
+          </Text>
+        ) : null}
         {diagnosticErrorLabel ? (
           <Text style={styles.diagnosticErrorText}>{diagnosticErrorLabel}</Text>
         ) : null}

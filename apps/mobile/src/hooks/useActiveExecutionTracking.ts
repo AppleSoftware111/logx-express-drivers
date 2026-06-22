@@ -13,7 +13,6 @@ import {
   hasBackgroundGpsStarted,
   startPresenceGps,
   stopBackgroundGps,
-  stopForegroundLocationStream,
   stopPresenceGps,
 } from '../services/gpsService';
 import { flushWorkflowOutbox } from '../services/routeWorkflowService';
@@ -63,12 +62,14 @@ export function useActiveExecutionTracking() {
       if (trackedExecutionId && trackedExecution && TERMINAL_STATUSES.has(trackedExecution.status)) {
         await stopBackgroundGps();
         await startPresenceGps({ requestPermissions: false });
+        await ensureForegroundLocationStream();
         return;
       }
 
       if (trackedExecutionId && Array.isArray(todayExecutions) && !trackedExecution) {
         await stopBackgroundGps();
         await startPresenceGps({ requestPermissions: false });
+        await ensureForegroundLocationStream();
         return;
       }
 
@@ -93,6 +94,7 @@ export function useActiveExecutionTracking() {
       if (currentMode !== 'presence') {
         await startPresenceGps({ requestPermissions: false });
       }
+      await ensureForegroundLocationStream();
     };
 
     const flushQueue = async () => {
@@ -107,8 +109,10 @@ export function useActiveExecutionTracking() {
         return;
       }
 
-      // App is backgrounded/locked: hand off to the OS foreground-service task.
-      stopForegroundLocationStream();
+      if (nextState === 'background' || nextState === 'inactive') {
+        void flushQueue();
+        void ensureForegroundLocationStream();
+      }
     };
 
     void ensureTrackingState();

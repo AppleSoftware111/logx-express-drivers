@@ -8,7 +8,7 @@ import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS, GPS_PRESENCE_INTERVAL_MS } from '@logx/shared';
 
-import { apiClient, ensureFreshToken, setBackgroundTaskContext } from './api';
+import { apiClient, ensureFreshToken, setBackgroundTaskContext, UPLOAD_REQUEST_TIMEOUT_MS } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
@@ -17,6 +17,8 @@ const GPS_QUEUE_STORAGE_KEY = 'gpsPendingQueue';
 const BATTERY_PROMPT_STORAGE_KEY = 'batteryOptimizationPromptShown';
 const LAST_GPS_SENT_STORAGE_KEY = 'lastGpsSentAt';
 const LAST_GPS_RESULT_STORAGE_KEY = 'lastGpsSendResult';
+const LAST_GPS_TASK_FIRED_STORAGE_KEY = 'lastGpsTaskFiredAt';
+const LAST_GPS_TASK_ERROR_STORAGE_KEY = 'lastGpsTaskError';
 const GPS_MODE_STORAGE_KEY = 'gpsTrackingMode';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
@@ -49,6 +51,7 @@ export interface GpsReadiness {
 
 let currentExecutionId: string | null = null;
 let foregroundWatch: Location.LocationSubscription | null = null;
+let foregroundWatchMode: GpsTrackingMode | 'off' = 'off';
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'undetermined';
 
@@ -82,7 +85,12 @@ export async function getLastGpsSentAt(): Promise<string | null> {
 
 /** Call on logout so diagnostics don't show stale results from the previous session. */
 export async function clearGpsDiagnostics(): Promise<void> {
-  await AsyncStorage.multiRemove([LAST_GPS_SENT_STORAGE_KEY, LAST_GPS_RESULT_STORAGE_KEY]);
+  await AsyncStorage.multiRemove([
+    LAST_GPS_SENT_STORAGE_KEY,
+    LAST_GPS_RESULT_STORAGE_KEY,
+    LAST_GPS_TASK_FIRED_STORAGE_KEY,
+    LAST_GPS_TASK_ERROR_STORAGE_KEY,
+  ]);
 }
 
 async function setLastGpsSendResult(result: string): Promise<void> {
@@ -91,6 +99,28 @@ async function setLastGpsSendResult(result: string): Promise<void> {
 
 export async function getLastGpsSendResult(): Promise<string | null> {
   return AsyncStorage.getItem(LAST_GPS_RESULT_STORAGE_KEY);
+}
+
+export async function getLastGpsTaskFiredAt(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_GPS_TASK_FIRED_STORAGE_KEY);
+}
+
+export async function getLastGpsTaskError(): Promise<string | null> {
+  return AsyncStorage.getItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+}
+
+export async function getQueuedGpsPayloadCount(): Promise<number> {
+  const queued = await readQueuedGpsPayloads();
+  return queued.length;
+}
+
+async function markGpsTaskFired(_locationCount: number): Promise<void> {
+  await AsyncStorage.setItem(LAST_GPS_TASK_FIRED_STORAGE_KEY, new Date().toISOString());
+  await AsyncStorage.removeItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+}
+
+async function markGpsTaskError(message: string): Promise<void> {
+  await AsyncStorage.setItem(LAST_GPS_TASK_ERROR_STORAGE_KEY, message);
 }
 
 /** Clears a stale auth failure when the current session is still valid. */
@@ -236,21 +266,25 @@ function toGpsPayload(
 }
 
 async function submitPresenceLocation(location: Location.LocationObject): Promise<boolean> {
-  const tokenOk = await ensureFreshToken();
+  const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
   if (!tokenOk) {
     await setLastGpsSendResult('http_401');
     return false;
   }
 
   try {
-    await apiClient.post('/tracking/presence', {
-      lat: location.coords.latitude,
-      lng: location.coords.longitude,
-      speed: location.coords.speed ?? undefined,
-      heading: location.coords.heading ?? undefined,
-      accuracy: location.coords.accuracy ?? undefined,
-      recordedAt: new Date(location.timestamp).toISOString(),
-    });
+    await apiClient.post(
+      '/tracking/presence',
+      {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+        speed: location.coords.speed ?? undefined,
+        heading: location.coords.heading ?? undefined,
+        accuracy: location.coords.accuracy ?? undefined,
+        recordedAt: new Date(location.timestamp).toISOString(),
+      },
+      { timeout: UPLOAD_REQUEST_TIMEOUT_MS }
+    );
     await markGpsSentNow();
     await setLastGpsSendResult('ok');
     return true;
@@ -263,14 +297,18 @@ async function submitPresenceLocation(location: Location.LocationObject): Promis
 async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   if (!payloads.length) return true;
 
-  const tokenOk = await ensureFreshToken();
+  const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
   if (!tokenOk) {
     await setLastGpsSendResult('http_401');
     return false;
   }
 
   try {
-    await apiClient.post('/tracking/location', { points: payloads });
+    await apiClient.post(
+      '/tracking/location',
+      { points: payloads },
+      { timeout: UPLOAD_REQUEST_TIMEOUT_MS }
+    );
     await markGpsSentNow();
     await setLastGpsSendResult('ok');
     return true;
@@ -335,10 +373,13 @@ TaskManager.defineTask(
   }) => {
     if (error) {
       console.error('[gps] Background task error:', error.message);
+      await markGpsTaskError(error.message);
       return;
     }
 
     if (!data?.locations?.length) return;
+
+    await markGpsTaskFired(data.locations.length);
 
     setBackgroundTaskContext(true);
     try {
@@ -348,11 +389,21 @@ TaskManager.defineTask(
       if (mode === 'route' && executionId) {
         const payloads = data.locations.map((location) => toGpsPayload(executionId, location));
         await appendQueuedGpsPayloads(payloads);
-        await flushQueuedGpsPayloads();
-      } else {
+        const flushed = await flushQueuedGpsPayloads();
+        if (!flushed) {
+          await markGpsTaskError('upload_failed');
+        }
+      } else if (mode === 'presence') {
         const latest = data.locations[data.locations.length - 1];
-        await submitPresenceLocation(latest);
+        const sent = await submitPresenceLocation(latest);
+        if (!sent) {
+          await markGpsTaskError('upload_failed');
+        }
       }
+    } catch (taskError) {
+      const message = taskError instanceof Error ? taskError.message : 'task_failed';
+      await markGpsTaskError(message);
+      console.error('[gps] Background task handler failed:', taskError);
     } finally {
       setBackgroundTaskContext(false);
     }
@@ -476,7 +527,11 @@ export async function startBackgroundGps(
   await AsyncStorage.setItem(ACTIVE_EXECUTION_STORAGE_KEY, executionId);
   await setPersistedGpsMode('route');
 
-  return startLocationTask(GPS_EMIT_INTERVAL_MS, i18n.t('mobile.gpsNotificationBody'));
+  const started = await startLocationTask(GPS_EMIT_INTERVAL_MS, i18n.t('mobile.gpsNotificationBody'));
+  if (started) {
+    await startForegroundLocationStream(executionId);
+  }
+  return started;
 }
 
 export async function startPresenceGps(
@@ -487,7 +542,14 @@ export async function startPresenceGps(
 
   await setPersistedGpsMode('presence');
 
-  return startLocationTask(GPS_PRESENCE_INTERVAL_MS, i18n.t('mobile.gpsPresenceNotificationBody'));
+  const started = await startLocationTask(
+    GPS_PRESENCE_INTERVAL_MS,
+    i18n.t('mobile.gpsPresenceNotificationBody')
+  );
+  if (started) {
+    await startPresenceForegroundStream();
+  }
+  return started;
 }
 
 export async function stopBackgroundGps(): Promise<void> {
@@ -590,34 +652,74 @@ async function enqueueAndFlushLocation(
   await flushQueuedGpsPayloads();
 }
 
-/**
- * Foreground location stream. While the app is open this guarantees continuous
- * updates even if the OS throttles the background foreground-service task.
- */
-export async function startForegroundLocationStream(executionId: string): Promise<void> {
-  if (foregroundWatch) return;
-
+async function startForegroundWatch(
+  mode: GpsTrackingMode,
+  executionId?: string | null
+): Promise<void> {
   const { status } = await Location.getForegroundPermissionsAsync();
   if (status !== 'granted') return;
 
-  setCurrentExecutionId(executionId);
+  if (foregroundWatch && foregroundWatchMode === mode) {
+    return;
+  }
 
-  foregroundWatch = await Location.watchPositionAsync(
-    {
-      accuracy: Location.Accuracy.BestForNavigation,
-      timeInterval: GPS_EMIT_INTERVAL_MS,
-      distanceInterval: 10,
-    },
-    (location) => {
-      void enqueueAndFlushLocation(executionId, location);
-    }
-  );
+  stopForegroundLocationStream();
+
+  if (mode === 'route' && executionId) {
+    setCurrentExecutionId(executionId);
+    foregroundWatchMode = 'route';
+    foregroundWatch = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: GPS_EMIT_INTERVAL_MS,
+        distanceInterval: 10,
+      },
+      (location) => {
+        void enqueueAndFlushLocation(executionId, location);
+      }
+    );
+    return;
+  }
+
+  if (mode === 'presence') {
+    foregroundWatchMode = 'presence';
+    foregroundWatch = await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: GPS_PRESENCE_INTERVAL_MS,
+        distanceInterval: 50,
+      },
+      (location) => {
+        void submitPresenceLocation(location);
+      }
+    );
+  }
+}
+
+/**
+ * Foreground location stream. Keeps sending while the app is open or locked
+ * (when combined with the Android foreground-service notification).
+ */
+export async function startForegroundLocationStream(executionId: string): Promise<void> {
+  await startForegroundWatch('route', executionId);
+}
+
+export async function startPresenceForegroundStream(): Promise<void> {
+  await startForegroundWatch('presence');
 }
 
 export async function ensureForegroundLocationStream(): Promise<void> {
-  const executionId = currentExecutionId ?? (await getPersistedExecutionId());
-  if (!executionId) return;
-  await startForegroundLocationStream(executionId);
+  const mode = await getGpsTrackingMode();
+  if (mode === 'route') {
+    const executionId = currentExecutionId ?? (await getPersistedExecutionId());
+    if (!executionId) return;
+    await startForegroundLocationStream(executionId);
+    return;
+  }
+
+  if (mode === 'presence') {
+    await startPresenceForegroundStream();
+  }
 }
 
 export function stopForegroundLocationStream(): void {
@@ -625,4 +727,5 @@ export function stopForegroundLocationStream(): void {
     foregroundWatch.remove();
     foregroundWatch = null;
   }
+  foregroundWatchMode = 'off';
 }
