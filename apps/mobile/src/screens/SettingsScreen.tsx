@@ -17,13 +17,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
-import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
+import { apiClient, clearAuthSession, ensureFreshToken, persistStoredUser } from '../services/api';
 import {
   clearGpsDiagnostics,
   getGpsTrackingMode,
   getLastGpsSendResult,
   getLastGpsSentAt,
   getNotificationPermissionState,
+  getTrackedExecutionId,
+  hasBackgroundGpsStarted,
+  ensureTrackedExecutionRunning,
+  startPresenceGps,
   requestIgnoreBatteryOptimizations,
   requestNotificationPermission,
   type GpsTrackingMode,
@@ -53,8 +57,41 @@ export function SettingsScreen({ onClose }: Props) {
   const [trackingMode, setTrackingMode] = useState<GpsTrackingMode>('off');
   const [lastGpsSentAt, setLastGpsSentAt] = useState<string | null>(null);
   const [lastGpsResult, setLastGpsResult] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshPermissions = async () => {
+    setIsRefreshing(true);
+    try {
+      await ensureTrackingServiceRunning();
+      await readDiagnostics();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const ensureTrackingServiceRunning = async () => {
+    try {
+      const tokenOk = await ensureFreshToken();
+      if (!tokenOk) return;
+
+      const trackedExecutionId = await getTrackedExecutionId();
+      if (trackedExecutionId) {
+        const isRunning = await hasBackgroundGpsStarted();
+        if (!isRunning) {
+          await ensureTrackedExecutionRunning(trackedExecutionId);
+        }
+      } else {
+        const currentMode = await getGpsTrackingMode();
+        if (currentMode === 'off') {
+          await startPresenceGps();
+        }
+      }
+    } catch {
+      // Restart failed — diagnostics will still show the current state below
+    }
+  };
+
+  const readDiagnostics = async () => {
     const [foreground, background, notifications, mode, lastSent, lastResult] = await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
@@ -267,8 +304,16 @@ export function SettingsScreen({ onClose }: Props) {
         />
         <InfoRow label={t('mobile.lastSendResult')} value={lastGpsResultLabel} />
         <Text style={styles.helperText}>{t('mobile.trackingDiagnosticsHint')}</Text>
-        <TouchableOpacity style={styles.settingsActionButton} onPress={() => void refreshPermissions()}>
-          <Text style={styles.settingsActionButtonText}>{t('mobile.refreshDiagnostics')}</Text>
+        <TouchableOpacity
+          style={[styles.settingsActionButton, isRefreshing && styles.settingsActionButtonDisabled]}
+          onPress={() => void refreshPermissions()}
+          disabled={isRefreshing}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color="#1d4ed8" />
+          ) : (
+            <Text style={styles.settingsActionButtonText}>{t('mobile.refreshDiagnostics')}</Text>
+          )}
         </TouchableOpacity>
       </View>
 
