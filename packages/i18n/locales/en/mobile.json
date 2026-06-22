@@ -126,5 +126,10 @@
   "trackingNeverReceived": "Never received",
   "gpsQueueDepth": "Pending uploads",
   "gpsQueueDepthValue": "{count} queued",
-  "lastBackgroundGpsError": "Background task error: {error}"
+  "lastBackgroundGpsError": "Background task error: {error}",
+  "tokenDriverId": "Driver ID in token",
+  "tokenDriverIdPresent": "Present",
+  "tokenDriverIdMissing": "Missing — log out and sign in again",
+  "clearGpsQueue": "Clear pending uploads",
+  "trackingRestartUpload": "Upload failed ({code}) — try Clear pending uploads, then Refresh"
 }

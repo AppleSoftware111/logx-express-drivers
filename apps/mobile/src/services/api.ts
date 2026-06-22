@@ -194,6 +194,40 @@ export function setBackgroundTaskContext(active: boolean): void {
   backgroundTaskContext = active;
 }
 
+/** Forces a refresh-token rotation to pick up new JWT claims (e.g. driverId after API deploy). */
+export async function forceRefreshAuthSession(): Promise<boolean> {
+  if (backgroundTaskContext) {
+    return false;
+  }
+  try {
+    await refreshAuthSession();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function jwtPayloadField(token: string, field: string): string | undefined {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return undefined;
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<
+      string,
+      unknown
+    >;
+    const value = decoded[field];
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getAccessTokenDriverId(): Promise<string | undefined> {
+  const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  if (!token) return undefined;
+  return jwtPayloadField(token, 'driverId');
+}
+
 async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken: string }> {
   if (refreshRequestPromise) {
     return refreshRequestPromise;

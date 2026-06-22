@@ -123,10 +123,10 @@ async function markGpsTaskError(message: string): Promise<void> {
   await AsyncStorage.setItem(LAST_GPS_TASK_ERROR_STORAGE_KEY, message);
 }
 
-/** Clears a stale auth failure when the current session is still valid. */
+/** Clears a stale 401 when the session was refreshed — never clears 403 (forbidden). */
 export async function reconcileStaleGpsSendResult(): Promise<void> {
   const result = await getLastGpsSendResult();
-  if (result !== 'http_401' && result !== 'http_403') {
+  if (result !== 'http_401') {
     return;
   }
 
@@ -385,6 +385,24 @@ export async function flushQueuedGpsPayloads(): Promise<boolean> {
   }
 
   return true;
+}
+
+/** Drops queued points that do not belong to the currently tracked execution. */
+export async function pruneGpsQueueToTrackedExecution(): Promise<number> {
+  const executionId = await getPersistedExecutionId();
+  if (!executionId) return 0;
+
+  const queued = await readQueuedGpsPayloads();
+  const matching = queued.filter((point) => point.executionId === executionId);
+  const dropped = queued.length - matching.length;
+  if (dropped > 0) {
+    await writeQueuedGpsPayloads(matching);
+  }
+  return dropped;
+}
+
+export async function clearGpsQueue(): Promise<void> {
+  await AsyncStorage.removeItem(GPS_QUEUE_STORAGE_KEY);
 }
 
 export async function activateTrackedExecution(executionId: string): Promise<boolean> {

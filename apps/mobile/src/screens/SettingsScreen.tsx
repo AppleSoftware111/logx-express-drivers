@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
-import { apiClient, clearAuthSession, ensureFreshToken, persistStoredUser } from '../services/api';
+import { apiClient, clearAuthSession, ensureFreshToken, forceRefreshAuthSession, getAccessTokenDriverId, persistStoredUser } from '../services/api';
 import {
   checkGpsReadiness,
   clearGpsDiagnostics,
+  clearGpsQueue,
   getGpsTrackingMode,
   getLastGpsSendResult,
   getLastGpsSentAt,
@@ -33,6 +34,7 @@ import {
   getLastGpsTaskFiredAt,
   getQueuedGpsPayloadCount,
   renormalizeQueuedGpsPayloads,
+  pruneGpsQueueToTrackedExecution,
   flushQueuedGpsPayloads,
   reconcileStaleGpsSendResult,
   requestRequiredLocationPermissions,
@@ -51,7 +53,7 @@ interface Props {
 
 type PermissionState = 'granted' | 'denied' | 'undetermined';
 
-type TrackingRestartError = 'auth' | 'permissions' | 'failed' | 'timeout';
+type TrackingRestartError = 'auth' | 'permissions' | 'failed' | 'timeout' | 'upload';
 
 const TRACKING_RESTART_TIMEOUT_MS = 25_000;
 
@@ -89,13 +91,14 @@ export function SettingsScreen({ onClose }: Props) {
   const [lastGpsTaskFiredAt, setLastGpsTaskFiredAt] = useState<string | null>(null);
   const [lastGpsTaskError, setLastGpsTaskError] = useState<string | null>(null);
   const [gpsQueueDepth, setGpsQueueDepth] = useState(0);
+  const [tokenDriverId, setTokenDriverId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState<TrackingRestartError | null>(null);
 
   const readDiagnostics = async () => {
     await reconcileStaleGpsSendResult();
 
-    const [foreground, background, notifications, mode, lastSent, lastResult, taskFired, taskError, queueDepth] =
+    const [foreground, background, notifications, mode, lastSent, lastResult, taskFired, taskError, queueDepth, driverIdInToken] =
       await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
@@ -106,6 +109,7 @@ export function SettingsScreen({ onClose }: Props) {
       getLastGpsTaskFiredAt(),
       getLastGpsTaskError(),
       getQueuedGpsPayloadCount(),
+      getAccessTokenDriverId(),
     ]);
 
     setForegroundPermission(foreground.status);
@@ -117,6 +121,7 @@ export function SettingsScreen({ onClose }: Props) {
     setLastGpsTaskFiredAt(taskFired);
     setLastGpsTaskError(taskError);
     setGpsQueueDepth(queueDepth);
+    setTokenDriverId(driverIdInToken ?? null);
   };
 
   const ensureTrackingServiceRunning = async (): Promise<TrackingRestartError | null> => {
@@ -135,7 +140,7 @@ export function SettingsScreen({ onClose }: Props) {
       return 'auth';
     }
 
-    await reconcileStaleGpsSendResult();
+    await forceRefreshAuthSession();
 
     const gpsStartOptions = { requestPermissions: false } as const;
     let started = true;
@@ -158,8 +163,17 @@ export function SettingsScreen({ onClose }: Props) {
 
     await ensureForegroundLocationStream();
     await renormalizeQueuedGpsPayloads();
-    await flushQueuedGpsPayloads();
+    await pruneGpsQueueToTrackedExecution();
+    const flushed = await flushQueuedGpsPayloads();
+    if (!flushed) {
+      return 'upload';
+    }
     return null;
+  };
+
+  const handleClearGpsQueue = async () => {
+    await clearGpsQueue();
+    await readDiagnostics();
   };
 
   const refreshPermissions = async () => {
@@ -204,6 +218,12 @@ export function SettingsScreen({ onClose }: Props) {
     if (diagnosticError === 'auth') return t('mobile.trackingRestartAuth');
     if (diagnosticError === 'permissions') return t('mobile.trackingRestartPermissions');
     if (diagnosticError === 'timeout') return t('mobile.trackingRestartTimeout');
+    if (diagnosticError === 'upload') {
+      const code = lastGpsResult ?? 'unknown';
+      if (code === 'http_403') return t('mobile.trackingSendForbidden');
+      if (code === 'http_401') return t('mobile.trackingSendAuth');
+      return t('mobile.trackingRestartUpload', { code });
+    }
     return t('mobile.trackingRestartFailed');
   })();
 
@@ -472,6 +492,12 @@ export function SettingsScreen({ onClose }: Props) {
           label={t('mobile.gpsQueueDepth')}
           value={t('mobile.gpsQueueDepthValue', { count: gpsQueueDepth })}
         />
+        <InfoRow
+          label={t('mobile.tokenDriverId')}
+          value={
+            tokenDriverId ? t('mobile.tokenDriverIdPresent') : t('mobile.tokenDriverIdMissing')
+          }
+        />
         {lastGpsTaskError ? (
           <Text style={styles.diagnosticErrorText}>
             {t('mobile.lastBackgroundGpsError', { error: lastGpsTaskError })}
@@ -481,6 +507,15 @@ export function SettingsScreen({ onClose }: Props) {
           <Text style={styles.diagnosticErrorText}>{diagnosticErrorLabel}</Text>
         ) : null}
         <Text style={styles.helperText}>{t('mobile.trackingDiagnosticsHint')}</Text>
+        {gpsQueueDepth > 0 ? (
+          <TouchableOpacity
+            style={[styles.settingsSecondaryButton, isRefreshing && styles.settingsActionButtonDisabled]}
+            onPress={() => void handleClearGpsQueue()}
+            disabled={isRefreshing}
+          >
+            <Text style={styles.settingsSecondaryButtonText}>{t('mobile.clearGpsQueue')}</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity
           style={[styles.settingsActionButton, isRefreshing && styles.settingsActionButtonDisabled]}
           onPress={() => void refreshPermissions()}
@@ -653,6 +688,20 @@ const styles = StyleSheet.create({
   },
   settingsActionButtonText: {
     color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  settingsSecondaryButton: {
+    marginTop: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d97706',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  settingsSecondaryButtonText: {
+    color: '#b45309',
     fontSize: 14,
     fontWeight: '700',
   },

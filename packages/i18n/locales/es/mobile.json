@@ -126,5 +126,10 @@
   "trackingNeverReceived": "Nunca recibido",
   "gpsQueueDepth": "Envíos pendientes",
   "gpsQueueDepthValue": "{count} en cola",
-  "lastBackgroundGpsError": "Error de tarea en segundo plano: {error}"
+  "lastBackgroundGpsError": "Error de tarea en segundo plano: {error}",
+  "tokenDriverId": "ID de conductor en el token",
+  "tokenDriverIdPresent": "Presente",
+  "tokenDriverIdMissing": "Ausente — cierre sesión y vuelva a entrar",
+  "clearGpsQueue": "Borrar envíos pendientes",
+  "trackingRestartUpload": "Error de envío ({code}) — use Borrar envíos pendientes y luego Actualizar"
 }

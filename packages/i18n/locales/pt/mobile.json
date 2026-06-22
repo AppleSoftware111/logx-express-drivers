@@ -126,5 +126,10 @@
   "trackingNeverReceived": "Nunca recebido",
   "gpsQueueDepth": "Envios pendentes",
   "gpsQueueDepthValue": "{count} na fila",
-  "lastBackgroundGpsError": "Erro da tarefa em segundo plano: {error}"
+  "lastBackgroundGpsError": "Erro da tarefa em segundo plano: {error}",
+  "tokenDriverId": "ID do motorista no token",
+  "tokenDriverIdPresent": "Presente",
+  "tokenDriverIdMissing": "Ausente — saia e entre novamente",
+  "clearGpsQueue": "Limpar envios pendentes",
+  "trackingRestartUpload": "Falha no envio ({code}) — use Limpar envios pendentes e depois Atualizar"
 }
