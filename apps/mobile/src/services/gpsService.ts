@@ -20,6 +20,12 @@ const LAST_GPS_RESULT_STORAGE_KEY = 'lastGpsSendResult';
 const GPS_MODE_STORAGE_KEY = 'gpsTrackingMode';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
+const LOCATION_START_TIMEOUT_MS = 20_000;
+
+export type GpsStartOptions = {
+  /** When false, only checks existing grants — does not open system permission dialogs. */
+  requestPermissions?: boolean;
+};
 
 export type GpsTrackingMode = 'route' | 'presence' | 'off';
 
@@ -85,6 +91,34 @@ async function setLastGpsSendResult(result: string): Promise<void> {
 
 export async function getLastGpsSendResult(): Promise<string | null> {
   return AsyncStorage.getItem(LAST_GPS_RESULT_STORAGE_KEY);
+}
+
+/** Clears a stale auth failure when the current session is still valid. */
+export async function reconcileStaleGpsSendResult(): Promise<void> {
+  const result = await getLastGpsSendResult();
+  if (result !== 'http_401' && result !== 'http_403') {
+    return;
+  }
+
+  const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
+  if (tokenOk) {
+    await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
+  }
+}
+
+function withGpsTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('location_start_timeout')), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }
 
 function describeGpsSendError(error: unknown): string {
@@ -275,7 +309,10 @@ export async function activateTrackedExecution(executionId: string): Promise<boo
   return started;
 }
 
-export async function ensureTrackedExecutionRunning(executionId: string): Promise<boolean> {
+export async function ensureTrackedExecutionRunning(
+  executionId: string,
+  options: GpsStartOptions = { requestPermissions: false }
+): Promise<boolean> {
   setCurrentExecutionId(executionId);
   await AsyncStorage.setItem(ACTIVE_EXECUTION_STORAGE_KEY, executionId);
 
@@ -284,7 +321,7 @@ export async function ensureTrackedExecutionRunning(executionId: string): Promis
     return true;
   }
 
-  return startBackgroundGps(executionId);
+  return startBackgroundGps(executionId, options);
 }
 
 TaskManager.defineTask(
@@ -382,6 +419,19 @@ export async function ensureGpsReadyForRouteStart(): Promise<GpsReadiness> {
   return requestRequiredLocationPermissions();
 }
 
+async function ensurePermissionsForGpsStart(options: GpsStartOptions): Promise<boolean> {
+  const readiness = await checkGpsReadiness();
+  if (readiness.ready) {
+    return true;
+  }
+
+  if (options.requestPermissions === false) {
+    return false;
+  }
+
+  return requestLocationPermissions();
+}
+
 async function startLocationTask(
   interval: number,
   notificationBody: string
@@ -391,24 +441,35 @@ async function startLocationTask(
     await Location.stopLocationUpdatesAsync(GPS_TASK_NAME);
   }
 
-  await Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
-    accuracy: Location.Accuracy.BestForNavigation,
-    timeInterval: interval,
-    distanceInterval: interval === GPS_EMIT_INTERVAL_MS ? 10 : 50,
-    foregroundService: {
-      notificationTitle: i18n.t('mobile.gpsNotificationTitle'),
-      notificationBody,
-      notificationColor: '#1d4ed8',
-    },
-    pausesUpdatesAutomatically: false,
-    activityType: Location.ActivityType.AutomotiveNavigation,
-  });
-
-  return true;
+  try {
+    await withGpsTimeout(
+      Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: interval,
+        distanceInterval: interval === GPS_EMIT_INTERVAL_MS ? 10 : 50,
+        foregroundService: {
+          notificationTitle: i18n.t('mobile.gpsNotificationTitle'),
+          notificationBody,
+          notificationColor: '#1d4ed8',
+        },
+        pausesUpdatesAutomatically: false,
+        activityType: Location.ActivityType.AutomotiveNavigation,
+        showsBackgroundLocationIndicator: true,
+      }),
+      LOCATION_START_TIMEOUT_MS
+    );
+    return true;
+  } catch (error) {
+    console.error('[gps] Failed to start location updates:', error);
+    return false;
+  }
 }
 
-export async function startBackgroundGps(executionId: string): Promise<boolean> {
-  const hasPermission = await requestLocationPermissions();
+export async function startBackgroundGps(
+  executionId: string,
+  options: GpsStartOptions = { requestPermissions: true }
+): Promise<boolean> {
+  const hasPermission = await ensurePermissionsForGpsStart(options);
   if (!hasPermission) return false;
 
   setCurrentExecutionId(executionId);
@@ -418,8 +479,10 @@ export async function startBackgroundGps(executionId: string): Promise<boolean> 
   return startLocationTask(GPS_EMIT_INTERVAL_MS, i18n.t('mobile.gpsNotificationBody'));
 }
 
-export async function startPresenceGps(): Promise<boolean> {
-  const hasPermission = await requestLocationPermissions();
+export async function startPresenceGps(
+  options: GpsStartOptions = { requestPermissions: true }
+): Promise<boolean> {
+  const hasPermission = await ensurePermissionsForGpsStart(options);
   if (!hasPermission) return false;
 
   await setPersistedGpsMode('presence');

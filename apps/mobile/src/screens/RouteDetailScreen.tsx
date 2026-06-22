@@ -24,7 +24,9 @@ import { useLocaleStore } from '../stores/localeStore';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   ensureGpsReadyForRouteStart,
+  ensureTrackedExecutionRunning,
   getTrackedExecutionId,
+  hasBackgroundGpsStarted,
   stopBackgroundGps,
 } from '../services/gpsService';
 import { submitOrQueueWorkflowEvent } from '../services/routeWorkflowService';
@@ -60,7 +62,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
   const queryClient = useQueryClient();
   const [view, setView] = useState<RouteDetailView>('route');
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
+  const [isGpsServiceRunning, setIsGpsServiceRunning] = useState(false);
   const [gpsWarning, setGpsWarning] = useState<string | null>(null);
 
   const { data: execution, isLoading, isError, refetch } = useQuery({
@@ -73,7 +75,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       const currentExecution = query.state.data as { status?: string } | undefined;
       if (!currentExecution?.status) return 15_000;
       if (['COMPLETED', 'CANCELLED'].includes(currentExecution.status)) return false;
-      return isTracking ? 5_000 : 15_000;
+      return currentExecution.status === 'IN_PROGRESS' ? 5_000 : 15_000;
     },
     refetchOnReconnect: true,
   });
@@ -91,21 +93,33 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
   });
 
   useEffect(() => {
-    void (async () => {
-      const trackedExecutionId = await getTrackedExecutionId();
-      if (trackedExecutionId === executionId) {
-        setIsTracking(true);
-      }
-    })();
-  }, [executionId]);
-
-  useEffect(() => {
-    if (execution?.status === 'IN_PROGRESS') {
-      setIsTracking(true);
+    if (execution?.status !== 'IN_PROGRESS') {
+      setIsGpsServiceRunning(false);
+      return;
     }
 
+    const syncGpsService = async () => {
+      let running = await hasBackgroundGpsStarted();
+      if (!running) {
+        const trackedExecutionId = await getTrackedExecutionId();
+        if (trackedExecutionId === executionId || !trackedExecutionId) {
+          await ensureTrackedExecutionRunning(executionId, { requestPermissions: false });
+          running = await hasBackgroundGpsStarted();
+        }
+      }
+      setIsGpsServiceRunning(running);
+    };
+
+    void syncGpsService();
+    const interval = setInterval(() => {
+      void syncGpsService();
+    }, 5_000);
+
+    return () => clearInterval(interval);
+  }, [executionId, execution?.status]);
+
+  useEffect(() => {
     if (['COMPLETED', 'CANCELLED'].includes(execution?.status ?? '')) {
-      setIsTracking(false);
       void stopBackgroundGps();
     }
   }, [execution?.status]);
@@ -166,7 +180,7 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
       // Navigate to summary screen — actual PATCH happens in RouteCompleteScreen
     },
     onSuccess: () => {
-      setIsTracking(false);
+      setIsGpsServiceRunning(false);
       if (onComplete && execution) {
         onComplete({
           executionId,
@@ -243,10 +257,16 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
         <Text style={styles.routeName}>{execution?.routeId?.name}</Text>
         <Text style={styles.scheduleTime}>{execution?.scheduledTime}</Text>
 
-        {isTracking && (
+        {isGpsServiceRunning && (
           <View style={styles.liveIndicator}>
             <View style={styles.liveDot} />
             <Text style={styles.liveText}>{t('mobile.gpsActive')}</Text>
+          </View>
+        )}
+        {execution?.status === 'IN_PROGRESS' && !isGpsServiceRunning && (
+          <View style={styles.gpsInactiveIndicator}>
+            <View style={styles.gpsInactiveDot} />
+            <Text style={styles.gpsInactiveText}>{t('mobile.gpsNotRunning')}</Text>
           </View>
         )}
       </View>
@@ -391,6 +411,19 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
   liveText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  gpsInactiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  gpsInactiveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fbbf24' },
+  gpsInactiveText: { color: '#fef3c7', fontSize: 12, fontWeight: '600', flexShrink: 1 },
   stopList: { flex: 1, backgroundColor: '#f3f4f6', padding: 12 },
   stopCard: {
     backgroundColor: '#fff',

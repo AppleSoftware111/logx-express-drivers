@@ -36,7 +36,7 @@ export async function initI18n(): Promise<SupportedLocale> {
       resources,
       lng: locale,
       fallbackLng: DEFAULT_LOCALE,
-      interpolation: { escapeValue: false },
+      interpolation: { escapeValue: false, prefix: '{', suffix: '}' },
       compatibilityJSON: 'v4',
     });
   } else {

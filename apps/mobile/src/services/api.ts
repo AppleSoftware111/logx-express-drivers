@@ -151,7 +151,7 @@ function jwtExpiresAtMs(token: string): number {
  * Refreshes proactively when the token has less than 90 seconds of life left.
  * Safe to call from background task contexts where the interceptor may not fire.
  */
-export async function ensureFreshToken(): Promise<boolean> {
+export async function ensureFreshToken(options?: { logoutOnFailure?: boolean }): Promise<boolean> {
   try {
     const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
     if (!token) {
@@ -168,7 +168,8 @@ export async function ensureFreshToken(): Promise<boolean> {
     if (backgroundTaskContext) {
       return false;
     }
-    if (!isRecoverableNetworkError(error)) {
+    const shouldLogout = options?.logoutOnFailure !== false;
+    if (shouldLogout && !isRecoverableNetworkError(error)) {
       await clearAuthSession();
       useAuthStore.getState().logout();
       await authFailureHandler?.();

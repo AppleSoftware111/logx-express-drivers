@@ -62,13 +62,13 @@ export function useActiveExecutionTracking() {
 
       if (trackedExecutionId && trackedExecution && TERMINAL_STATUSES.has(trackedExecution.status)) {
         await stopBackgroundGps();
-        await startPresenceGps();
+        await startPresenceGps({ requestPermissions: false });
         return;
       }
 
       if (trackedExecutionId && Array.isArray(todayExecutions) && !trackedExecution) {
         await stopBackgroundGps();
-        await startPresenceGps();
+        await startPresenceGps({ requestPermissions: false });
         return;
       }
 
@@ -82,7 +82,7 @@ export function useActiveExecutionTracking() {
       if (trackedExecutionId) {
         const isRunning = await hasBackgroundGpsStarted();
         if (!isRunning) {
-          await ensureTrackedExecutionRunning(trackedExecutionId);
+          await ensureTrackedExecutionRunning(trackedExecutionId, { requestPermissions: false });
         }
         await ensureForegroundLocationStream();
         return;
@@ -91,7 +91,7 @@ export function useActiveExecutionTracking() {
       // No active route — ensure presence GPS is running
       const currentMode = await getGpsTrackingMode();
       if (currentMode !== 'presence') {
-        await startPresenceGps();
+        await startPresenceGps({ requestPermissions: false });
       }
     };
 

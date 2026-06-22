@@ -19,6 +19,7 @@ import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
 import { apiClient, clearAuthSession, ensureFreshToken, persistStoredUser } from '../services/api';
 import {
+  checkGpsReadiness,
   clearGpsDiagnostics,
   getGpsTrackingMode,
   getLastGpsSendResult,
@@ -27,6 +28,8 @@ import {
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
   ensureTrackedExecutionRunning,
+  reconcileStaleGpsSendResult,
+  requestRequiredLocationPermissions,
   startPresenceGps,
   requestIgnoreBatteryOptimizations,
   requestNotificationPermission,
@@ -42,6 +45,25 @@ interface Props {
 
 type PermissionState = 'granted' | 'denied' | 'undetermined';
 
+type TrackingRestartError = 'auth' | 'permissions' | 'failed' | 'timeout';
+
+const TRACKING_RESTART_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export function SettingsScreen({ onClose }: Props) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -54,44 +76,16 @@ export function SettingsScreen({ onClose }: Props) {
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermissionState>('undetermined');
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [trackingMode, setTrackingMode] = useState<GpsTrackingMode>('off');
   const [lastGpsSentAt, setLastGpsSentAt] = useState<string | null>(null);
   const [lastGpsResult, setLastGpsResult] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const refreshPermissions = async () => {
-    setIsRefreshing(true);
-    try {
-      await ensureTrackingServiceRunning();
-      await readDiagnostics();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const ensureTrackingServiceRunning = async () => {
-    try {
-      const tokenOk = await ensureFreshToken();
-      if (!tokenOk) return;
-
-      const trackedExecutionId = await getTrackedExecutionId();
-      if (trackedExecutionId) {
-        const isRunning = await hasBackgroundGpsStarted();
-        if (!isRunning) {
-          await ensureTrackedExecutionRunning(trackedExecutionId);
-        }
-      } else {
-        const currentMode = await getGpsTrackingMode();
-        if (currentMode === 'off') {
-          await startPresenceGps();
-        }
-      }
-    } catch {
-      // Restart failed — diagnostics will still show the current state below
-    }
-  };
+  const [diagnosticError, setDiagnosticError] = useState<TrackingRestartError | null>(null);
 
   const readDiagnostics = async () => {
+    await reconcileStaleGpsSendResult();
+
     const [foreground, background, notifications, mode, lastSent, lastResult] = await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
@@ -109,6 +103,71 @@ export function SettingsScreen({ onClose }: Props) {
     setLastGpsResult(lastResult);
   };
 
+  const ensureTrackingServiceRunning = async (): Promise<TrackingRestartError | null> => {
+    const readiness = await checkGpsReadiness();
+    if (
+      !readiness.servicesEnabled ||
+      !readiness.foregroundGranted ||
+      !readiness.backgroundGranted ||
+      !readiness.notificationGranted
+    ) {
+      return 'permissions';
+    }
+
+    const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
+    if (!tokenOk) {
+      return 'auth';
+    }
+
+    await reconcileStaleGpsSendResult();
+
+    const gpsStartOptions = { requestPermissions: false } as const;
+    let started = true;
+    const trackedExecutionId = await getTrackedExecutionId();
+    if (trackedExecutionId) {
+      const isRunning = await hasBackgroundGpsStarted();
+      if (!isRunning) {
+        started = await ensureTrackedExecutionRunning(trackedExecutionId, gpsStartOptions);
+      }
+    } else {
+      const currentMode = await getGpsTrackingMode();
+      if (currentMode === 'off') {
+        started = await startPresenceGps(gpsStartOptions);
+      }
+    }
+
+    if (!started && !(await hasBackgroundGpsStarted())) {
+      return 'failed';
+    }
+
+    return null;
+  };
+
+  const refreshPermissions = async () => {
+    setIsRefreshing(true);
+    setDiagnosticError(null);
+    try {
+      await readDiagnostics();
+      const restartError = await withTimeout(
+        ensureTrackingServiceRunning(),
+        TRACKING_RESTART_TIMEOUT_MS
+      );
+      if (restartError) {
+        setDiagnosticError(restartError);
+      }
+      await readDiagnostics();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'timeout') {
+        setDiagnosticError('timeout');
+      } else {
+        setDiagnosticError('failed');
+      }
+      await readDiagnostics();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const lastGpsResultLabel = (() => {
     if (!lastGpsResult) return t('mobile.trackingNeverSent');
     if (lastGpsResult === 'ok') return t('mobile.trackingSendOk');
@@ -117,6 +176,17 @@ export function SettingsScreen({ onClose }: Props) {
     }
     return t('mobile.trackingSendFailed', { code: lastGpsResult });
   })();
+
+  const diagnosticErrorLabel = (() => {
+    if (!diagnosticError) return null;
+    if (diagnosticError === 'auth') return t('mobile.trackingRestartAuth');
+    if (diagnosticError === 'permissions') return t('mobile.trackingRestartPermissions');
+    if (diagnosticError === 'timeout') return t('mobile.trackingRestartTimeout');
+    return t('mobile.trackingRestartFailed');
+  })();
+
+  const locationPermissionsGranted =
+    foregroundPermission === 'granted' && backgroundPermission === 'granted';
 
   useEffect(() => {
     void (async () => {
@@ -156,6 +226,55 @@ export function SettingsScreen({ onClose }: Props) {
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const runtimeVersion = Constants.expoConfig?.runtimeVersion ?? 'local';
   const appName = Constants.expoConfig?.name ?? t('common.appName');
+
+  const handleLocationPermission = async () => {
+    if (locationPermissionsGranted) {
+      await Linking.openSettings();
+      return;
+    }
+
+    setIsUpdatingLocation(true);
+    setDiagnosticError(null);
+    try {
+      const result = await requestRequiredLocationPermissions();
+
+      if (!result.foregroundGranted || !result.backgroundGranted || !result.servicesEnabled) {
+        Alert.alert(
+          t('common.errorTitle'),
+          t('mobile.locationRequiredForTracking'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('mobile.openSystemSettings'),
+              onPress: () => {
+                void Linking.openSettings();
+              },
+            },
+          ]
+        );
+      }
+    } finally {
+      setIsUpdatingLocation(false);
+      await readDiagnostics();
+      try {
+        const restartError = await withTimeout(
+          ensureTrackingServiceRunning(),
+          TRACKING_RESTART_TIMEOUT_MS
+        );
+        if (restartError) {
+          setDiagnosticError(restartError);
+        }
+        await readDiagnostics();
+      } catch (error) {
+        if (error instanceof Error && error.message === 'timeout') {
+          setDiagnosticError('timeout');
+        } else {
+          setDiagnosticError('failed');
+        }
+        await readDiagnostics();
+      }
+    }
+  };
 
   const handleNotificationPermission = async () => {
     if (notificationPermission === 'granted') {
@@ -253,6 +372,22 @@ export function SettingsScreen({ onClose }: Props) {
           label={t('mobile.notificationPermission')}
           status={notificationPermission}
         />
+        <Text style={styles.helperText}>{t('mobile.locationPermissionHint')}</Text>
+        <TouchableOpacity
+          style={[styles.settingsActionButton, isUpdatingLocation && styles.settingsActionButtonDisabled]}
+          onPress={() => void handleLocationPermission()}
+          disabled={isUpdatingLocation}
+        >
+          {isUpdatingLocation ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.settingsActionButtonText}>
+              {locationPermissionsGranted
+                ? t('mobile.openSystemSettings')
+                : t('mobile.enableLocationPermissions')}
+            </Text>
+          )}
+        </TouchableOpacity>
         <Text style={styles.helperText}>{t('mobile.notificationPermissionHint')}</Text>
         <TouchableOpacity
           style={[styles.settingsActionButton, isUpdatingNotifications && styles.settingsActionButtonDisabled]}
@@ -303,6 +438,9 @@ export function SettingsScreen({ onClose }: Props) {
           value={lastGpsSentAt ? formatTimeByLocale(lastGpsSentAt, locale) : t('mobile.trackingNeverSent')}
         />
         <InfoRow label={t('mobile.lastSendResult')} value={lastGpsResultLabel} />
+        {diagnosticErrorLabel ? (
+          <Text style={styles.diagnosticErrorText}>{diagnosticErrorLabel}</Text>
+        ) : null}
         <Text style={styles.helperText}>{t('mobile.trackingDiagnosticsHint')}</Text>
         <TouchableOpacity
           style={[styles.settingsActionButton, isRefreshing && styles.settingsActionButtonDisabled]}
@@ -430,6 +568,13 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 12,
   },
+  diagnosticErrorText: {
+    fontSize: 13,
+    color: '#b45309',
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 4,
+  },
   languageRow: {
     flexDirection: 'row',
     gap: 10,
@@ -475,21 +620,25 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e5e7eb',
   },
   infoLabel: {
-    flex: 1,
+    flexShrink: 0,
+    width: '42%',
     fontSize: 14,
     color: '#374151',
   },
   infoValue: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
     marginLeft: 12,
+    textAlign: 'right',
   },
   logoutButton: {
     marginTop: 24,

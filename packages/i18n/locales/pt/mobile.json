@@ -24,6 +24,7 @@
   "minLate": "{minutes} min de atraso",
   "back": "Voltar",
   "gpsActive": "Rastreamento GPS ativo",
+  "gpsNotRunning": "GPS não está enviando — abra Configurações e toque em Atualizar",
   "proofOfDelivery": "Comprovante de entrega",
   "captureReceiverInfo": "Capture a foto e as informações do recebedor",
   "retakePhoto": "Refazer foto",
@@ -112,5 +113,12 @@
   "trackingSendAuth": "Sessão expirada — reabra o app para entrar novamente",
   "trackingSendFailed": "Falhou ({code})",
   "trackingDiagnosticsHint": "Mostra se o serviço de GPS está ativo e quando a última localização chegou ao servidor. Use para verificar o rastreamento neste aparelho.",
-  "refreshDiagnostics": "Atualizar"
+  "refreshDiagnostics": "Atualizar",
+  "enableLocationPermissions": "Ativar localização",
+  "locationPermissionHint": "A localização deve estar em \"Sempre\" para o GPS continuar enviando com a tela bloqueada.",
+  "locationRequiredForTracking": "Permita o acesso à localização (incluindo em segundo plano / Sempre) para o app rastrear sua rota com a tela bloqueada.",
+  "trackingRestartAuth": "Não foi possível renovar sua sessão. Feche Configurações, reabra o app e entre novamente.",
+  "trackingRestartPermissions": "A localização não está totalmente permitida. Toque em Ativar localização acima e escolha Sempre.",
+  "trackingRestartFailed": "Não foi possível reiniciar o serviço de rastreamento. Verifique as permissões e tente novamente.",
+  "trackingRestartTimeout": "A reinicialização demorou demais. Confira se a localização está em Sempre e tente novamente."
 }

@@ -24,6 +24,7 @@
   "minLate": "{minutes} min late",
   "back": "Back",
   "gpsActive": "GPS tracking active",
+  "gpsNotRunning": "GPS not sending — open Settings and tap Refresh",
   "proofOfDelivery": "Proof of delivery",
   "captureReceiverInfo": "Capture photo and receiver information",
   "retakePhoto": "Retake photo",
@@ -112,5 +113,12 @@
   "trackingSendAuth": "Session expired — reopen the app to sign in again",
   "trackingSendFailed": "Failed ({code})",
   "trackingDiagnosticsHint": "Shows whether the GPS service is running and when the last location reached the server. Use this to check tracking on this device.",
-  "refreshDiagnostics": "Refresh"
+  "refreshDiagnostics": "Refresh",
+  "enableLocationPermissions": "Enable location",
+  "locationPermissionHint": "Location must be set to \"Always\" so GPS keeps sending when the screen is locked.",
+  "locationRequiredForTracking": "Allow location access (including background / Always) so the app can track your route when the screen is locked.",
+  "trackingRestartAuth": "Could not refresh your session. Close Settings, reopen the app, and sign in again.",
+  "trackingRestartPermissions": "Location is not fully granted. Tap Enable location above and choose Always.",
+  "trackingRestartFailed": "Could not restart the tracking service. Check permissions and try again.",
+  "trackingRestartTimeout": "Restart took too long. Check that location is set to Always and try again."
 }
