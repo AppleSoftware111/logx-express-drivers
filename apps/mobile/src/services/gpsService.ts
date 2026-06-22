@@ -6,9 +6,9 @@ import * as TaskManager from 'expo-task-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, Linking, Platform } from 'react-native';
 
-import { GPS_EMIT_INTERVAL_MS } from '@logx/shared';
+import { GPS_EMIT_INTERVAL_MS, GPS_PRESENCE_INTERVAL_MS } from '@logx/shared';
 
-import { apiClient, ensureFreshToken } from './api';
+import { apiClient, ensureFreshToken, setBackgroundTaskContext } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
@@ -17,8 +17,11 @@ const GPS_QUEUE_STORAGE_KEY = 'gpsPendingQueue';
 const BATTERY_PROMPT_STORAGE_KEY = 'batteryOptimizationPromptShown';
 const LAST_GPS_SENT_STORAGE_KEY = 'lastGpsSentAt';
 const LAST_GPS_RESULT_STORAGE_KEY = 'lastGpsSendResult';
+const GPS_MODE_STORAGE_KEY = 'gpsTrackingMode';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
+
+export type GpsTrackingMode = 'route' | 'presence' | 'off';
 
 export interface GpsPayload {
   executionId: string;
@@ -45,6 +48,26 @@ export type NotificationPermissionState = 'granted' | 'denied' | 'undetermined';
 
 async function markGpsSentNow(): Promise<void> {
   await AsyncStorage.setItem(LAST_GPS_SENT_STORAGE_KEY, new Date().toISOString());
+}
+
+async function getPersistedGpsMode(): Promise<GpsTrackingMode> {
+  const mode = await AsyncStorage.getItem(GPS_MODE_STORAGE_KEY);
+  if (mode === 'route' || mode === 'presence') return mode;
+  return 'off';
+}
+
+async function setPersistedGpsMode(mode: GpsTrackingMode): Promise<void> {
+  if (mode === 'off') {
+    await AsyncStorage.removeItem(GPS_MODE_STORAGE_KEY);
+  } else {
+    await AsyncStorage.setItem(GPS_MODE_STORAGE_KEY, mode);
+  }
+}
+
+export async function getGpsTrackingMode(): Promise<GpsTrackingMode> {
+  const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
+  if (!isRunning) return 'off';
+  return getPersistedGpsMode();
 }
 
 export async function getLastGpsSentAt(): Promise<string | null> {
@@ -178,12 +201,34 @@ function toGpsPayload(
   };
 }
 
+async function submitPresenceLocation(location: Location.LocationObject): Promise<boolean> {
+  const tokenOk = await ensureFreshToken();
+  if (!tokenOk) {
+    await setLastGpsSendResult('http_401');
+    return false;
+  }
+
+  try {
+    await apiClient.post('/tracking/presence', {
+      lat: location.coords.latitude,
+      lng: location.coords.longitude,
+      speed: location.coords.speed ?? undefined,
+      heading: location.coords.heading ?? undefined,
+      accuracy: location.coords.accuracy ?? undefined,
+      recordedAt: new Date(location.timestamp).toISOString(),
+    });
+    await markGpsSentNow();
+    await setLastGpsSendResult('ok');
+    return true;
+  } catch (error) {
+    await setLastGpsSendResult(describeGpsSendError(error));
+    return false;
+  }
+}
+
 async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   if (!payloads.length) return true;
 
-  // Proactively refresh the access token when it has < 90 s of life left.
-  // This is critical for background task context where the axios interceptor
-  // may not trigger: without this, a 15-min token expiry silently kills uploads.
   const tokenOk = await ensureFreshToken();
   if (!tokenOk) {
     await setLastGpsSendResult('http_401');
@@ -242,7 +287,6 @@ export async function ensureTrackedExecutionRunning(executionId: string): Promis
   return startBackgroundGps(executionId);
 }
 
-// Define background task
 TaskManager.defineTask(
   GPS_TASK_NAME,
   async ({
@@ -259,14 +303,22 @@ TaskManager.defineTask(
 
     if (!data?.locations?.length) return;
 
-    const executionId = currentExecutionId ?? (await getPersistedExecutionId());
+    setBackgroundTaskContext(true);
+    try {
+      const mode = await getPersistedGpsMode();
+      const executionId = currentExecutionId ?? (await getPersistedExecutionId());
 
-    if (!executionId) return;
-
-    const payloads = data.locations.map((location) => toGpsPayload(executionId, location));
-
-    await appendQueuedGpsPayloads(payloads);
-    await flushQueuedGpsPayloads();
+      if (mode === 'route' && executionId) {
+        const payloads = data.locations.map((location) => toGpsPayload(executionId, location));
+        await appendQueuedGpsPayloads(payloads);
+        await flushQueuedGpsPayloads();
+      } else {
+        const latest = data.locations[data.locations.length - 1];
+        await submitPresenceLocation(latest);
+      }
+    } finally {
+      setBackgroundTaskContext(false);
+    }
   }
 );
 
@@ -330,25 +382,22 @@ export async function ensureGpsReadyForRouteStart(): Promise<GpsReadiness> {
   return requestRequiredLocationPermissions();
 }
 
-export async function startBackgroundGps(executionId: string): Promise<boolean> {
-  const hasPermission = await requestLocationPermissions();
-  if (!hasPermission) return false;
-
-  setCurrentExecutionId(executionId);
-  await AsyncStorage.setItem(ACTIVE_EXECUTION_STORAGE_KEY, executionId);
-
+async function startLocationTask(
+  interval: number,
+  notificationBody: string
+): Promise<boolean> {
   const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
   if (isRunning) {
-    return true;
+    await Location.stopLocationUpdatesAsync(GPS_TASK_NAME);
   }
 
   await Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
     accuracy: Location.Accuracy.BestForNavigation,
-    timeInterval: GPS_EMIT_INTERVAL_MS,
-    distanceInterval: 10,
+    timeInterval: interval,
+    distanceInterval: interval === GPS_EMIT_INTERVAL_MS ? 10 : 50,
     foregroundService: {
       notificationTitle: i18n.t('mobile.gpsNotificationTitle'),
-      notificationBody: i18n.t('mobile.gpsNotificationBody'),
+      notificationBody,
       notificationColor: '#1d4ed8',
     },
     pausesUpdatesAutomatically: false,
@@ -358,10 +407,40 @@ export async function startBackgroundGps(executionId: string): Promise<boolean> 
   return true;
 }
 
+export async function startBackgroundGps(executionId: string): Promise<boolean> {
+  const hasPermission = await requestLocationPermissions();
+  if (!hasPermission) return false;
+
+  setCurrentExecutionId(executionId);
+  await AsyncStorage.setItem(ACTIVE_EXECUTION_STORAGE_KEY, executionId);
+  await setPersistedGpsMode('route');
+
+  return startLocationTask(GPS_EMIT_INTERVAL_MS, i18n.t('mobile.gpsNotificationBody'));
+}
+
+export async function startPresenceGps(): Promise<boolean> {
+  const hasPermission = await requestLocationPermissions();
+  if (!hasPermission) return false;
+
+  await setPersistedGpsMode('presence');
+
+  return startLocationTask(GPS_PRESENCE_INTERVAL_MS, i18n.t('mobile.gpsPresenceNotificationBody'));
+}
+
 export async function stopBackgroundGps(): Promise<void> {
   setCurrentExecutionId(null);
   await AsyncStorage.removeItem(ACTIVE_EXECUTION_STORAGE_KEY);
+  await setPersistedGpsMode('off');
   stopForegroundLocationStream();
+
+  const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
+  if (isRunning) {
+    await Location.stopLocationUpdatesAsync(GPS_TASK_NAME);
+  }
+}
+
+export async function stopPresenceGps(): Promise<void> {
+  await setPersistedGpsMode('off');
 
   const isRunning = await Location.hasStartedLocationUpdatesAsync(GPS_TASK_NAME);
   if (isRunning) {

@@ -3,6 +3,7 @@ export const GEOFENCE_RADIUS_METERS = 100;
 export const GPS_BUFFER_FLUSH_INTERVAL_MS = 30_000;
 
 export const GPS_EMIT_INTERVAL_MS = 5_000;
+export const GPS_PRESENCE_INTERVAL_MS = 30_000;
 
 export const GPS_TTL_DAYS = 90;
 

@@ -8,10 +8,13 @@ import {
   ensureForegroundLocationStream,
   ensureTrackedExecutionRunning,
   flushQueuedGpsPayloads,
+  getGpsTrackingMode,
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
+  startPresenceGps,
   stopBackgroundGps,
   stopForegroundLocationStream,
+  stopPresenceGps,
 } from '../services/gpsService';
 import { flushWorkflowOutbox } from '../services/routeWorkflowService';
 import { useAuthStore } from '../stores/authStore';
@@ -59,15 +62,18 @@ export function useActiveExecutionTracking() {
 
       if (trackedExecutionId && trackedExecution && TERMINAL_STATUSES.has(trackedExecution.status)) {
         await stopBackgroundGps();
+        await startPresenceGps();
         return;
       }
 
       if (trackedExecutionId && Array.isArray(todayExecutions) && !trackedExecution) {
         await stopBackgroundGps();
+        await startPresenceGps();
         return;
       }
 
       if (!trackedExecutionId && inProgressExecution) {
+        await stopPresenceGps();
         await activateTrackedExecution(inProgressExecution._id);
         await ensureForegroundLocationStream();
         return;
@@ -79,6 +85,13 @@ export function useActiveExecutionTracking() {
           await ensureTrackedExecutionRunning(trackedExecutionId);
         }
         await ensureForegroundLocationStream();
+        return;
+      }
+
+      // No active route — ensure presence GPS is running
+      const currentMode = await getGpsTrackingMode();
+      if (currentMode !== 'presence') {
+        await startPresenceGps();
       }
     };
 

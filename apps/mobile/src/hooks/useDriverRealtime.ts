@@ -12,6 +12,8 @@ import {
 } from '../services/gpsService';
 import { useSocketStore } from '../stores/socketStore';
 
+const PRESENCE_INTERVAL_MS = 30_000;
+
 type DriverRouteRealtimePayload = {
   event: string;
   executionId?: string;
@@ -116,9 +118,16 @@ export function useDriverRealtime() {
       handleConnect();
     }
 
+    const presenceInterval = setInterval(() => {
+      if (socket.connected) {
+        void emitPresenceLocation();
+      }
+    }, PRESENCE_INTERVAL_MS);
+
     const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
+      clearInterval(presenceInterval);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error', handleConnectError);

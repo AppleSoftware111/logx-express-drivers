@@ -20,12 +20,13 @@ import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 import { apiClient, clearAuthSession, persistStoredUser } from '../services/api';
 import {
   clearGpsDiagnostics,
+  getGpsTrackingMode,
   getLastGpsSendResult,
   getLastGpsSentAt,
   getNotificationPermissionState,
-  hasBackgroundGpsStarted,
   requestIgnoreBatteryOptimizations,
   requestNotificationPermission,
+  type GpsTrackingMode,
   type NotificationPermissionState,
 } from '../services/gpsService';
 import { useAuthStore } from '../stores/authStore';
@@ -49,16 +50,16 @@ export function SettingsScreen({ onClose }: Props) {
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermissionState>('undetermined');
   const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
-  const [trackingActive, setTrackingActive] = useState(false);
+  const [trackingMode, setTrackingMode] = useState<GpsTrackingMode>('off');
   const [lastGpsSentAt, setLastGpsSentAt] = useState<string | null>(null);
   const [lastGpsResult, setLastGpsResult] = useState<string | null>(null);
 
   const refreshPermissions = async () => {
-    const [foreground, background, notifications, tracking, lastSent, lastResult] = await Promise.all([
+    const [foreground, background, notifications, mode, lastSent, lastResult] = await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
       getNotificationPermissionState(),
-      hasBackgroundGpsStarted(),
+      getGpsTrackingMode(),
       getLastGpsSentAt(),
       getLastGpsSendResult(),
     ]);
@@ -66,7 +67,7 @@ export function SettingsScreen({ onClose }: Props) {
     setForegroundPermission(foreground.status);
     setBackgroundPermission(background.status);
     setNotificationPermission(notifications);
-    setTrackingActive(tracking);
+    setTrackingMode(mode);
     setLastGpsSentAt(lastSent);
     setLastGpsResult(lastResult);
   };
@@ -252,7 +253,13 @@ export function SettingsScreen({ onClose }: Props) {
         <Text style={styles.sectionTitle}>{t('mobile.trackingDiagnostics')}</Text>
         <InfoRow
           label={t('mobile.trackingStatus')}
-          value={trackingActive ? t('mobile.trackingActiveLabel') : t('mobile.trackingInactiveLabel')}
+          value={
+            trackingMode === 'route'
+              ? t('mobile.trackingActiveRoute')
+              : trackingMode === 'presence'
+                ? t('mobile.trackingActivePresence')
+                : t('mobile.trackingInactiveLabel')
+          }
         />
         <InfoRow
           label={t('mobile.lastLocationSent')}

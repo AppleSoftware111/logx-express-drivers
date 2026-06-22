@@ -23,6 +23,7 @@ export const UPLOAD_REQUEST_TIMEOUT_MS = 60_000;
 type AuthFailureHandler = () => void | Promise<void>;
 let authFailureHandler: AuthFailureHandler | null = null;
 let refreshRequestPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+let backgroundTaskContext = false;
 
 export type StoredAuthUser = {
   id: string;
@@ -164,6 +165,9 @@ export async function ensureFreshToken(): Promise<boolean> {
     }
     return true;
   } catch (error) {
+    if (backgroundTaskContext) {
+      return false;
+    }
     if (!isRecoverableNetworkError(error)) {
       await clearAuthSession();
       useAuthStore.getState().logout();
@@ -171,6 +175,10 @@ export async function ensureFreshToken(): Promise<boolean> {
     }
     return false;
   }
+}
+
+export function setBackgroundTaskContext(active: boolean): void {
+  backgroundTaskContext = active;
 }
 
 async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken: string }> {
