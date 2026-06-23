@@ -169,7 +169,18 @@ export async function getMeService(userId: string) {
     throw new AppError(ApiErrorCode.USER_NOT_FOUND, 404);
   }
 
-  return user;
+  await resolveDriverIdForUser(user);
+
+  const refreshedUser = await User.findById(userId)
+    .select('-passwordHash -refreshTokens')
+    .populate('companyId', 'name logo')
+    .lean();
+
+  if (!refreshedUser) {
+    throw new AppError(ApiErrorCode.USER_NOT_FOUND, 404);
+  }
+
+  return refreshedUser;
 }
 
 export async function updateUserPreferencesService(

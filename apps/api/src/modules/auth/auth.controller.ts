@@ -52,7 +52,10 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
 
   res.cookie(REFRESH_COOKIE_NAME, tokens.refreshToken, cookieOptions);
 
-  return sendSuccess(res, { accessToken: tokens.accessToken });
+  return sendSuccess(res, {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  });
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {

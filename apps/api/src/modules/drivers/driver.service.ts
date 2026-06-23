@@ -132,6 +132,10 @@ export async function updateDriver(
         user.passwordHash = await hashPassword(rawPassword);
       }
 
+      if (!user.driverId || user.driverId.toString() !== driver._id.toString()) {
+        user.driverId = driver._id;
+      }
+
       await user.save();
     }
   }

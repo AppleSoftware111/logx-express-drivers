@@ -163,7 +163,7 @@ Scan QR with **Expo Go**, or press `a` for emulator.
 | Build fails: missing icon | Run `npm run generate:assets` |
 | App crashes immediately on a real phone | You probably installed the LDPlayer `x86_64` APK. Build again with `npm run build:apk:cloud` or `npm run build:apk:standalone:phone:universal` |
 | Cleartext HTTP blocked | `usesCleartextTraffic: true` is set in `app.config.js` for dev HTTP |
-| GPS not updating | Grant location “Always” on device; driver must be online on a route; disable battery optimization for the app on Samsung/Xiaomi/Motorola devices |
+| GPS not updating | See **[Background GPS — development & troubleshooting](#background-gps--development--troubleshooting)** below |
 
 ## Battery optimization checklist
 
@@ -186,14 +186,16 @@ Recommended operator wording for the client:
 Run this before sending an APK to the client:
 
 1. Install the APK on a real phone and log in with a driver account.
-2. Start a route and confirm the blue background tracking notification appears.
-3. Lock the phone for 5-10 minutes while moving or simulating movement.
-4. Confirm the driver still appears on:
-   - admin dashboard map
-   - operations map
-   - execution detail page
-5. Unlock the phone and confirm the session is still active without re-login.
-6. Complete the route and confirm tracking stops after completion.
+2. Confirm **Settings → Driver ID in token** shows **Present** (1.0.5+).
+3. Start a route and confirm the blue background tracking notification appears.
+4. **Settings → Refresh** — **Last upload result: Success**, **Pending uploads: 0**.
+5. Lock the phone for 5-10 minutes while moving or simulating movement.
+6. Unlock → **Settings → Refresh** — **Last background GPS event** and **Last location sent** updated.
+7. Confirm the driver still appears on admin dashboard / operations map (green marker if updated within ~45s).
+8. Unlock the phone and confirm the session is still active without re-login.
+9. Complete the route and confirm tracking stops after completion.
+
+See **[Background GPS — development & troubleshooting](#background-gps--development--troubleshooting)** for failure lookup and dev checklist.
 
 ---
 
@@ -243,6 +245,134 @@ Run these checks on real Android hardware before giving an APK to the client:
 9. Driver taps **Route Completed** and tracking stops.
 10. Admin execution detail shows the full audit timeline and proof trail.
 11. Driver does not need to log in again after locking/unlocking the phone.
+
+---
+
+## Background GPS — development & troubleshooting
+
+This section documents root causes found during production testing (real Samsung/Motorola phones vs LDPlayer) and a checklist for future Android GPS work.
+
+### How tracking is supposed to work
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Foreground service (expo-location startLocationUpdatesAsync)  │
+│  + foreground watchPosition (while route active)             │
+│  → queue points in AsyncStorage                              │
+│  → flush via apiClient + ensureFreshToken / forceRefresh     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+Key files:
+
+| Area | Path |
+|------|------|
+| GPS service, queue, background task | `apps/mobile/src/services/gpsService.ts` |
+| Token refresh, force refresh | `apps/mobile/src/services/api.ts` |
+| App-state / route tracking hook | `apps/mobile/src/hooks/useActiveExecutionTracking.ts` |
+| Diagnostics UI | `apps/mobile/src/screens/SettingsScreen.tsx` |
+| Tracking API | `apps/api/src/modules/tracking/tracking.routes.ts` |
+| Driver ID resolution | `apps/api/src/utils/resolveDriverId.ts` |
+| GPS point validation | `packages/shared/src/schemas/execution.schemas.ts` (`gpsPointSchema`) |
+
+Background task is registered in `apps/mobile/index.js` **before** the app tree mounts.
+
+### Root causes we hit (summary)
+
+| # | Issue | Symptom | Fix |
+|---|--------|---------|-----|
+| 1 | Route UI showed “GPS active” for `IN_PROGRESS` only | Green badge while nothing reached server | Badge must use `hasStartedLocationUpdatesAsync()` + successful upload |
+| 2 | Foreground watch stopped on screen lock | Works open, fails locked | Do not call `stopForegroundLocationStream()` on background; keep FGS + watch |
+| 3 | Background uploads without token refresh | Stops ~15 min (JWT expiry) | Use `apiClient` + `ensureFreshToken` in task and flush |
+| 4 | JWT missing `driverId` | `http_403`, 500 queued, “Not sent yet” | API: `resolveDriverIdForUser`; mobile: force refresh after deploy + re-login |
+| 5 | Android `speed: -1` / `heading: -1` | `http_400`, whole batch fails | Sanitize metrics before POST (omit invalid values) |
+| 6 | Diagnostics cleared `http_403` when token looked valid | Hidden real error | Only clear stale `http_401`, never `403` |
+| 7 | Offline queue filled to 500 | Nothing new appears to send | Prune to current `executionId`, “Clear pending uploads”, flush on Refresh |
+| 8 | i18n `{var}` not interpolated | `{completed}/{total} paradas` in UI | `interpolation: { prefix: '{', suffix: '}' }` in `src/i18n/index.ts` |
+| 9 | LDPlayer `x86_64` APK on real phone | Crash or odd behavior | Build `arm64-v8a` or universal APK |
+| 10 | OEM battery optimization | Service killed when locked | Unrestricted battery + persistent notification |
+
+### Diagnostics screen (Settings → Tracking diagnostics)
+
+Ship every GPS-related build with these fields visible (version **1.0.5+**):
+
+| Field | Meaning |
+|-------|---------|
+| **Tracking service** | `Active (route)` / `presence` / `Inactive` — from `hasStartedLocationUpdatesAsync` |
+| **Last location sent** | Timestamp of last **successful** server upload |
+| **Last upload result** | `Success`, `http_403`, `http_400`, `http_401`, etc. |
+| **Last background GPS event** | Last time the OS background task delivered locations (proves lock-screen GPS) |
+| **Pending uploads** | Points waiting in local queue |
+| **Driver ID in token** | `Present` / `Missing` — JWT must include `driverId` for `/tracking/location` |
+
+**Do not trust** the route header “GPS tracking active” alone — it reflects real service state only in builds that tie it to `hasBackgroundGpsStarted()`.
+
+### QA pass criteria (real phone)
+
+1. Install correct APK (`build:apk:standalone:phone:universal` for mixed fleets).
+2. Log in → grant **Always** location, notifications, **unrestricted** battery.
+3. Open an **IN_PROGRESS** route → persistent **LOGX** notification in status bar.
+4. Settings → **Refresh**:
+   - **Driver ID in token:** Present
+   - **Last upload result:** Success
+   - **Pending uploads:** 0
+5. Lock phone **2–3 minutes** → unlock → **Refresh**:
+   - **Last background GPS event** shows a recent time
+   - **Last location sent** keeps updating
+6. Web dashboard: driver marker **green** within ~45 seconds (`DRIVER_LOCATION_LIVE_WINDOW_MS`).
+
+### Failure lookup
+
+| What you see | Likely cause | Action |
+|--------------|--------------|--------|
+| Active + **Not sent yet** + **500 queued** | Upload failing (403/400) | Check **Last upload result**; Clear queue → Refresh; re-login after API deploy |
+| **http_403** | No `driverId` on JWT / user not linked to Driver | Deploy API `resolveDriverId`; log out/in; check **Driver ID in token** |
+| **http_400** | Invalid GPS fields in batch | Ensure `sanitizeGpsPayload` strips negative speed/heading |
+| **Never received** (background event) | OS not delivering background locations | Battery unrestricted; lock test; check notification still visible |
+| Works on LDPlayer, not phone | Wrong ABI or emulator-only permissions | Universal/arm64 APK; real permission flow |
+| **Driver ID in token: Missing** | `User.driverId` and `Driver.userId` not linked in DB | Fix in admin / MongoDB, then re-login |
+
+### Sanitize GPS before API (required on Android)
+
+API schema (`gpsPointSchema`) requires `speed >= 0`, `heading` 0–360. Android often reports `-1` when unknown.
+
+```typescript
+// Omit invalid optional metrics — never send -1
+speed:   value >= 0 ? value : undefined
+heading: value >= 0 && value <= 360 ? value : undefined
+accuracy: value >= 0 ? value : undefined
+```
+
+Apply in `toGpsPayload()` and again when flushing the offline queue.
+
+### Auth & deploy order
+
+1. **Deploy API first** (tracking routes, `resolveDriverId`, `getTodayExecutions` for prior-day `IN_PROGRESS`).
+2. Ship mobile APK with matching diagnostics.
+3. On device: **uninstall → install → log in** (new JWT with `driverId`).
+4. If queue was corrupted: **Clear pending uploads** → **Refresh**.
+
+Use `forceRefreshAuthSession()` on Settings Refresh to pick up new JWT claims after a backend deploy without waiting for token expiry.
+
+### Development checklist (before each release)
+
+- [ ] Bump `expo.version` and `android.versionCode` in `app.json`
+- [ ] `EXPO_PUBLIC_API_URL` points to target API in `.env` / EAS profile
+- [ ] Build **universal** or **phone** APK, not LDPlayer, for client handoff
+- [ ] Type-check / lint / `npm run test:i18n` pass
+- [ ] API deployed before asking client to test uploads
+- [ ] Operator smoke test on **one real phone** (not emulator only)
+- [ ] Lock-screen test with diagnostics screenshot (Success + background event time)
+
+### Version reference (GPS fixes)
+
+| Version | Notable GPS changes |
+|---------|---------------------|
+| 1.0.1 | Settings location button, refresh errors, proactive token refresh |
+| 1.0.2 | Honest GPS badge, i18n interpolation, keep watch when locked, task diagnostics |
+| 1.0.3 | Background upload timeout, dual path tracking |
+| 1.0.4 | Sanitize GPS metrics, queue renormalize |
+| 1.0.5 | Fix hidden 403, force token refresh, Driver ID in token, clear queue |
 
 ---
 

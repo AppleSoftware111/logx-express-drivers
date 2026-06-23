@@ -23,6 +23,7 @@ import {
   isDefinitiveAuthFailure,
   registerAuthFailureHandler,
   persistStoredUser,
+  rotateAuthSession,
   type StoredAuthUser,
 } from './src/services/api';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
@@ -114,6 +115,7 @@ function AppContent() {
         }
 
         if (session.accessToken || session.refreshToken) {
+          await rotateAuthSession();
           const res = await apiClient.get('/auth/me');
           const raw = res.data.data as {
             _id?: string;

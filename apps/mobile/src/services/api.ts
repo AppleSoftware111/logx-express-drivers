@@ -167,6 +167,7 @@ export async function ensureFreshToken(options?: { logoutOnFailure?: boolean }):
     if (msLeft < 90_000) {
       try {
         await refreshAuthSession();
+        await syncStoredUserFromAccessToken();
       } catch (refreshError) {
         // In background, keep using the current access token if it has not expired yet.
         if (backgroundTaskContext && msLeft > 0) {
@@ -174,6 +175,10 @@ export async function ensureFreshToken(options?: { logoutOnFailure?: boolean }):
         }
         throw refreshError;
       }
+    }
+
+    if (!(await ensureDriverClaimInAccessToken())) {
+      return false;
     }
     return true;
   } catch (error) {
@@ -196,11 +201,14 @@ export function setBackgroundTaskContext(active: boolean): void {
 
 /** Forces a refresh-token rotation to pick up new JWT claims (e.g. driverId after API deploy). */
 export async function forceRefreshAuthSession(): Promise<boolean> {
-  if (backgroundTaskContext) {
-    return false;
-  }
+  return rotateAuthSession();
+}
+
+/** Rotates the session and syncs driver claims into local storage. Works in background GPS context. */
+export async function rotateAuthSession(): Promise<boolean> {
   try {
     await refreshAuthSession();
+    await syncStoredUserFromAccessToken();
     return true;
   } catch {
     return false;
@@ -219,6 +227,39 @@ function jwtPayloadField(token: string, field: string): string | undefined {
     return typeof value === 'string' && value.length > 0 ? value : undefined;
   } catch {
     return undefined;
+  }
+}
+
+export async function syncStoredUserFromAccessToken(): Promise<void> {
+  const [token, storedUser] = await Promise.all([
+    SecureStore.getItemAsync(ACCESS_TOKEN_KEY),
+    getStoredUser(),
+  ]);
+  if (!token || !storedUser) return;
+
+  const driverId = jwtPayloadField(token, 'driverId');
+  if (!driverId || driverId === storedUser.driverId) return;
+
+  const nextUser = { ...storedUser, driverId };
+  await persistStoredUser(nextUser);
+  useAuthStore.getState().updateUser({ driverId });
+}
+
+async function ensureDriverClaimInAccessToken(): Promise<boolean> {
+  const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  if (!token) return false;
+
+  const role = jwtPayloadField(token, 'role');
+  if (role !== 'DRIVER') return true;
+  if (jwtPayloadField(token, 'driverId')) return true;
+
+  try {
+    await refreshAuthSession();
+    await syncStoredUserFromAccessToken();
+    const refreshed = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+    return Boolean(refreshed && jwtPayloadField(refreshed, 'driverId'));
+  } catch {
+    return false;
   }
 }
 
@@ -260,6 +301,7 @@ async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken
     const nextRefreshToken = rotatedRefreshToken ?? refreshToken;
     await persistAuthSession(accessToken, nextRefreshToken);
     useAuthStore.getState().updateTokens(accessToken, nextRefreshToken);
+    await syncStoredUserFromAccessToken();
 
     return {
       accessToken,

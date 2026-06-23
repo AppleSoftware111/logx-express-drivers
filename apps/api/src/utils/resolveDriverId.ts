@@ -7,34 +7,52 @@ type UserLike = {
   driverId?: { toString(): string } | null;
 };
 
+async function syncUserDriverId(userId: string, driverObjectId: unknown): Promise<void> {
+  await User.findByIdAndUpdate(userId, { $set: { driverId: driverObjectId } });
+}
+
 /**
  * Returns the driver's Mongo id for tracking uploads.
- * Falls back to Driver.userId when User.driverId was never synced.
+ * Validates JWT claims, then falls back to User.driverId and Driver.userId.
  */
 export async function resolveDriverIdForUser(
   user: UserLike,
   driverIdFromToken?: string
 ): Promise<string | undefined> {
-  if (driverIdFromToken) {
-    return driverIdFromToken;
-  }
-
   if (user.role !== 'DRIVER') {
     return undefined;
   }
 
-  if (user.driverId) {
-    return user.driverId.toString();
+  const userId = user._id.toString();
+
+  if (driverIdFromToken) {
+    const linkedDriver = await Driver.findOne({ _id: driverIdFromToken, userId: user._id })
+      .select('_id')
+      .lean();
+    if (linkedDriver?._id) {
+      if (!user.driverId) {
+        await syncUserDriverId(userId, linkedDriver._id);
+      }
+      return linkedDriver._id.toString();
+    }
   }
 
-  const userId = user._id.toString();
+  if (user.driverId) {
+    const linkedDriver = await Driver.findOne({ _id: user.driverId, userId: user._id })
+      .select('_id')
+      .lean();
+    if (linkedDriver?._id) {
+      return linkedDriver._id.toString();
+    }
+  }
+
   const driver = await Driver.findOne({ userId: user._id }).select('_id').lean();
   if (!driver?._id) {
     return undefined;
   }
 
   const resolvedId = driver._id.toString();
-  await User.findByIdAndUpdate(userId, { $set: { driverId: driver._id } });
+  await syncUserDriverId(userId, driver._id);
   return resolvedId;
 }
 
@@ -43,10 +61,6 @@ export async function resolveDriverIdByUserId(
   role: string,
   driverIdFromToken?: string
 ): Promise<string | undefined> {
-  if (driverIdFromToken) {
-    return driverIdFromToken;
-  }
-
   if (role !== 'DRIVER') {
     return undefined;
   }
@@ -56,5 +70,5 @@ export async function resolveDriverIdByUserId(
     return undefined;
   }
 
-  return resolveDriverIdForUser(user, undefined);
+  return resolveDriverIdForUser(user, driverIdFromToken);
 }

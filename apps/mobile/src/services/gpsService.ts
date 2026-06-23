@@ -8,7 +8,7 @@ import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS, GPS_PRESENCE_INTERVAL_MS } from '@logx/shared';
 
-import { apiClient, ensureFreshToken, setBackgroundTaskContext, UPLOAD_REQUEST_TIMEOUT_MS } from './api';
+import { apiClient, ensureFreshToken, rotateAuthSession, setBackgroundTaskContext, UPLOAD_REQUEST_TIMEOUT_MS } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
@@ -308,7 +308,10 @@ export async function renormalizeQueuedGpsPayloads(): Promise<number> {
   return sanitized.length;
 }
 
-async function submitPresenceLocation(location: Location.LocationObject): Promise<boolean> {
+async function submitPresenceLocation(
+  location: Location.LocationObject,
+  allowAuthRetry = true
+): Promise<boolean> {
   const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
   if (!tokenOk) {
     await setLastGpsSendResult('http_401');
@@ -323,12 +326,19 @@ async function submitPresenceLocation(location: Location.LocationObject): Promis
     await setLastGpsSendResult('ok');
     return true;
   } catch (error) {
-    await setLastGpsSendResult(describeGpsSendError(error));
+    const errorCode = describeGpsSendError(error);
+    if (errorCode === 'http_403' && allowAuthRetry) {
+      const rotated = await rotateAuthSession();
+      if (rotated) {
+        return submitPresenceLocation(location, false);
+      }
+    }
+    await setLastGpsSendResult(errorCode);
     return false;
   }
 }
 
-async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
+async function submitGpsPayloadBatch(payloads: GpsPayload[], allowAuthRetry = true): Promise<boolean> {
   if (!payloads.length) return true;
 
   const sanitized = payloads.map(sanitizeGpsPayload);
@@ -351,10 +361,17 @@ async function submitGpsPayloadBatch(payloads: GpsPayload[]): Promise<boolean> {
   } catch (error) {
     const errorCode = describeGpsSendError(error);
 
+    if (errorCode === 'http_403' && allowAuthRetry) {
+      const rotated = await rotateAuthSession();
+      if (rotated) {
+        return submitGpsPayloadBatch(payloads, false);
+      }
+    }
+
     if (errorCode === 'http_400' && sanitized.length > 1) {
       let accepted = 0;
       for (const point of sanitized) {
-        if (await submitGpsPayloadBatch([point])) {
+        if (await submitGpsPayloadBatch([point], allowAuthRetry)) {
           accepted += 1;
         }
       }
