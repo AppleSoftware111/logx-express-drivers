@@ -130,6 +130,15 @@
   "tokenDriverId": "ID de conductor en el token",
   "tokenDriverIdPresent": "Presente",
   "tokenDriverIdMissing": "Ausente — cierre sesión y vuelva a entrar",
+  "refreshTokenStatus": "Estado del refresh token",
+  "refreshTokenMissing": "Ausente — cierre sesión y vuelva a entrar",
+  "refreshTokenPresentNotProbed": "Presente (pulse Actualizar para probar)",
+  "refreshTokenProbeOkRotated": "OK — sesión renovada correctamente",
+  "refreshTokenProbeOkStale": "Advertencia — el refresh funciona pero el servidor no rotó el token (actualice la API)",
+  "refreshTokenProbeFailed": "Falló — cierre sesión y vuelva a entrar",
+  "accessTokenExpiry": "El token de acceso expira en",
+  "accessTokenMinutesLeft": "{minutes} min",
+  "authTokenUnknown": "Desconocido",
   "clearGpsQueue": "Borrar envíos pendientes",
   "trackingRestartUpload": "Error de envío ({code}) — use Borrar envíos pendientes y luego Actualizar"
 }

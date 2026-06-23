@@ -8,7 +8,7 @@ import { Alert, Linking, Platform } from 'react-native';
 
 import { GPS_EMIT_INTERVAL_MS, GPS_PRESENCE_INTERVAL_MS } from '@logx/shared';
 
-import { apiClient, ensureFreshToken, rotateAuthSession, setBackgroundTaskContext, UPLOAD_REQUEST_TIMEOUT_MS } from './api';
+import { apiClient, ensureFreshToken, getAccessTokenDriverId, rotateAuthSession, setBackgroundTaskContext, UPLOAD_REQUEST_TIMEOUT_MS } from './api';
 import { i18n } from '../i18n';
 
 const GPS_TASK_NAME = 'logx-background-gps';
@@ -123,17 +123,35 @@ async function markGpsTaskError(message: string): Promise<void> {
   await AsyncStorage.setItem(LAST_GPS_TASK_ERROR_STORAGE_KEY, message);
 }
 
-/** Clears a stale 401 when the session was refreshed — never clears 403 (forbidden). */
+/** Clears a stale 401/403 when the session was refreshed — never clears other errors. */
 export async function reconcileStaleGpsSendResult(): Promise<void> {
   const result = await getLastGpsSendResult();
-  if (result !== 'http_401') {
+  if (result !== 'http_401' && result !== 'http_403') {
     return;
   }
 
   const tokenOk = await ensureFreshToken({ logoutOnFailure: false });
-  if (tokenOk) {
-    await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
+  if (!tokenOk) {
+    return;
   }
+
+  if (result === 'http_403') {
+    const driverId = await getAccessTokenDriverId();
+    if (driverId) {
+      await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
+      await AsyncStorage.removeItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+      return;
+    }
+
+    const rotated = await rotateAuthSession();
+    if (rotated && (await getAccessTokenDriverId())) {
+      await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
+      await AsyncStorage.removeItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+    }
+    return;
+  }
+
+  await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
 }
 
 function withGpsTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -226,6 +244,14 @@ async function writeQueuedGpsPayloads(payloads: GpsPayload[]): Promise<void> {
 
 async function appendQueuedGpsPayloads(payloads: GpsPayload[]): Promise<void> {
   if (!payloads.length) return;
+
+  const lastResult = await getLastGpsSendResult();
+  if (lastResult === 'http_403' || lastResult === 'http_401') {
+    // Auth is broken — do not grow the offline queue while locked/idle.
+    await writeQueuedGpsPayloads(payloads.slice(-3));
+    return;
+  }
+
   const existing = await readQueuedGpsPayloads();
   await writeQueuedGpsPayloads([...existing, ...payloads]);
 }

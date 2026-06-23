@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatTimeByLocale, type SupportedLocale } from '@logx/i18n';
 
-import { apiClient, clearAuthSession, ensureFreshToken, forceRefreshAuthSession, getAccessTokenDriverId, persistStoredUser } from '../services/api';
+import { apiClient, clearAuthSession, ensureFreshToken, getAccessTokenDriverId, getAuthTokenDiagnostics, persistStoredUser, type AuthTokenDiagnostics } from '../services/api';
 import {
   checkGpsReadiness,
   clearGpsDiagnostics,
@@ -92,13 +92,14 @@ export function SettingsScreen({ onClose }: Props) {
   const [lastGpsTaskError, setLastGpsTaskError] = useState<string | null>(null);
   const [gpsQueueDepth, setGpsQueueDepth] = useState(0);
   const [tokenDriverId, setTokenDriverId] = useState<string | null>(null);
+  const [authDiagnostics, setAuthDiagnostics] = useState<AuthTokenDiagnostics | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState<TrackingRestartError | null>(null);
 
   const readDiagnostics = async () => {
     await reconcileStaleGpsSendResult();
 
-    const [foreground, background, notifications, mode, lastSent, lastResult, taskFired, taskError, queueDepth, driverIdInToken] =
+    const [foreground, background, notifications, mode, lastSent, lastResult, taskFired, taskError, queueDepth, driverIdInToken, authTokenState] =
       await Promise.all([
       Location.getForegroundPermissionsAsync(),
       Location.getBackgroundPermissionsAsync(),
@@ -110,6 +111,7 @@ export function SettingsScreen({ onClose }: Props) {
       getLastGpsTaskError(),
       getQueuedGpsPayloadCount(),
       getAccessTokenDriverId(),
+      getAuthTokenDiagnostics(),
     ]);
 
     setForegroundPermission(foreground.status);
@@ -122,6 +124,7 @@ export function SettingsScreen({ onClose }: Props) {
     setLastGpsTaskError(taskError);
     setGpsQueueDepth(queueDepth);
     setTokenDriverId(driverIdInToken ?? null);
+    setAuthDiagnostics(authTokenState);
   };
 
   const ensureTrackingServiceRunning = async (): Promise<TrackingRestartError | null> => {
@@ -140,7 +143,14 @@ export function SettingsScreen({ onClose }: Props) {
       return 'auth';
     }
 
-    await forceRefreshAuthSession();
+    const authAfterRefresh = await getAuthTokenDiagnostics({ probeRefresh: true });
+    setAuthDiagnostics(authAfterRefresh);
+    if (
+      authAfterRefresh.refreshProbeStatus === 'failed' ||
+      authAfterRefresh.refreshProbeStatus === 'missing_refresh'
+    ) {
+      return 'auth';
+    }
 
     const gpsStartOptions = { requestPermissions: false } as const;
     let started = true;
@@ -225,6 +235,34 @@ export function SettingsScreen({ onClose }: Props) {
       return t('mobile.trackingRestartUpload', { code });
     }
     return t('mobile.trackingRestartFailed');
+  })();
+
+  const refreshTokenStatusLabel = (() => {
+    if (!authDiagnostics) return t('mobile.authTokenUnknown');
+    if (!authDiagnostics.refreshTokenPresent) {
+      return t('mobile.refreshTokenMissing');
+    }
+    if (authDiagnostics.refreshProbeStatus === 'ok') {
+      return authDiagnostics.apiReturnsRotatedRefresh
+        ? t('mobile.refreshTokenProbeOkRotated')
+        : t('mobile.refreshTokenProbeOkStale');
+    }
+    if (authDiagnostics.refreshProbeStatus === 'failed') {
+      return t('mobile.refreshTokenProbeFailed');
+    }
+    if (authDiagnostics.refreshProbeStatus === 'missing_refresh') {
+      return t('mobile.refreshTokenMissing');
+    }
+    return t('mobile.refreshTokenPresentNotProbed');
+  })();
+
+  const accessTokenExpiryLabel = (() => {
+    if (authDiagnostics?.accessTokenMinutesLeft == null) {
+      return t('mobile.authTokenUnknown');
+    }
+    return t('mobile.accessTokenMinutesLeft', {
+      minutes: authDiagnostics.accessTokenMinutesLeft,
+    });
   })();
 
   const locationPermissionsGranted =
@@ -498,6 +536,8 @@ export function SettingsScreen({ onClose }: Props) {
             tokenDriverId ? t('mobile.tokenDriverIdPresent') : t('mobile.tokenDriverIdMissing')
           }
         />
+        <InfoRow label={t('mobile.refreshTokenStatus')} value={refreshTokenStatusLabel} />
+        <InfoRow label={t('mobile.accessTokenExpiry')} value={accessTokenExpiryLabel} />
         {lastGpsTaskError ? (
           <Text style={styles.diagnosticErrorText}>
             {t('mobile.lastBackgroundGpsError', { error: lastGpsTaskError })}

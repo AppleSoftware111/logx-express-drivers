@@ -269,6 +269,63 @@ export async function getAccessTokenDriverId(): Promise<string | undefined> {
   return jwtPayloadField(token, 'driverId');
 }
 
+export type AuthTokenDiagnostics = {
+  refreshTokenPresent: boolean;
+  accessTokenExpiresAt: string | null;
+  accessTokenMinutesLeft: number | null;
+  refreshProbeStatus: 'ok' | 'missing_refresh' | 'failed' | 'not_probed';
+  refreshTokenRotated: boolean;
+  apiReturnsRotatedRefresh: boolean;
+};
+
+export async function getAuthTokenDiagnostics(options?: {
+  probeRefresh?: boolean;
+}): Promise<AuthTokenDiagnostics> {
+  const session = await getStoredAuthSession();
+  const accessToken = session.accessToken;
+  const refreshTokenPresent = Boolean(session.refreshToken);
+
+  let accessTokenExpiresAt: string | null = null;
+  let accessTokenMinutesLeft: number | null = null;
+
+  if (accessToken) {
+    const expiresAtMs = jwtExpiresAtMs(accessToken);
+    if (expiresAtMs > 0) {
+      accessTokenExpiresAt = new Date(expiresAtMs).toISOString();
+      accessTokenMinutesLeft = Math.max(0, Math.round((expiresAtMs - Date.now()) / 60_000));
+    }
+  }
+
+  let refreshProbeStatus: AuthTokenDiagnostics['refreshProbeStatus'] = 'not_probed';
+  let refreshTokenRotated = false;
+  let apiReturnsRotatedRefresh = false;
+
+  if (options?.probeRefresh) {
+    if (!session.refreshToken) {
+      refreshProbeStatus = 'missing_refresh';
+    } else {
+      const beforeRefresh = session.refreshToken;
+      try {
+        const rotated = await refreshAuthSession();
+        refreshProbeStatus = 'ok';
+        refreshTokenRotated = rotated.refreshToken !== beforeRefresh;
+        apiReturnsRotatedRefresh = refreshTokenRotated;
+      } catch {
+        refreshProbeStatus = 'failed';
+      }
+    }
+  }
+
+  return {
+    refreshTokenPresent,
+    accessTokenExpiresAt,
+    accessTokenMinutesLeft,
+    refreshProbeStatus,
+    refreshTokenRotated,
+    apiReturnsRotatedRefresh,
+  };
+}
+
 async function refreshAuthSession(): Promise<{ accessToken: string; refreshToken: string }> {
   if (refreshRequestPromise) {
     return refreshRequestPromise;

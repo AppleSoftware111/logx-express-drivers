@@ -130,6 +130,15 @@
   "tokenDriverId": "ID do motorista no token",
   "tokenDriverIdPresent": "Presente",
   "tokenDriverIdMissing": "Ausente — saia e entre novamente",
+  "refreshTokenStatus": "Status do refresh token",
+  "refreshTokenMissing": "Ausente — saia e entre novamente",
+  "refreshTokenPresentNotProbed": "Presente (toque em Atualizar para testar)",
+  "refreshTokenProbeOkRotated": "OK — sessão renovada com sucesso",
+  "refreshTokenProbeOkStale": "Aviso — refresh funciona mas o servidor não rotacionou o token (atualize a API)",
+  "refreshTokenProbeFailed": "Falhou — saia e entre novamente",
+  "accessTokenExpiry": "Token de acesso expira em",
+  "accessTokenMinutesLeft": "{minutes} min",
+  "authTokenUnknown": "Desconhecido",
   "clearGpsQueue": "Limpar envios pendentes",
   "trackingRestartUpload": "Falha no envio ({code}) — use Limpar envios pendentes e depois Atualizar"
 }

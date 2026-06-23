@@ -130,6 +130,15 @@
   "tokenDriverId": "Driver ID in token",
   "tokenDriverIdPresent": "Present",
   "tokenDriverIdMissing": "Missing — log out and sign in again",
+  "refreshTokenStatus": "Refresh token status",
+  "refreshTokenMissing": "Missing — log out and sign in again",
+  "refreshTokenPresentNotProbed": "Present (tap Refresh to test)",
+  "refreshTokenProbeOkRotated": "OK — session rotated successfully",
+  "refreshTokenProbeOkStale": "Warning — refresh works but server did not rotate token (update API)",
+  "refreshTokenProbeFailed": "Failed — log out and sign in again",
+  "accessTokenExpiry": "Access token expires in",
+  "accessTokenMinutesLeft": "{minutes} min",
+  "authTokenUnknown": "Unknown",
   "clearGpsQueue": "Clear pending uploads",
   "trackingRestartUpload": "Upload failed ({code}) — try Clear pending uploads, then Refresh"
 }
