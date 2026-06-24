@@ -33,9 +33,7 @@ import {
   getLastGpsTaskError,
   getLastGpsTaskFiredAt,
   getQueuedGpsPayloadCount,
-  renormalizeQueuedGpsPayloads,
-  pruneGpsQueueToTrackedExecution,
-  flushQueuedGpsPayloads,
+  autoRecoverGpsUploads,
   reconcileStaleGpsSendResult,
   requestRequiredLocationPermissions,
   startPresenceGps,
@@ -172,10 +170,8 @@ export function SettingsScreen({ onClose }: Props) {
     }
 
     await ensureForegroundLocationStream();
-    await renormalizeQueuedGpsPayloads();
-    await pruneGpsQueueToTrackedExecution();
-    const flushed = await flushQueuedGpsPayloads();
-    if (!flushed) {
+    const recovered = await autoRecoverGpsUploads({ aggressive: true });
+    if (!recovered) {
       return 'upload';
     }
     return null;

@@ -22,6 +22,11 @@ const LAST_GPS_TASK_ERROR_STORAGE_KEY = 'lastGpsTaskError';
 const GPS_MODE_STORAGE_KEY = 'gpsTrackingMode';
 const GPS_QUEUE_LIMIT = 500;
 const GPS_BATCH_SIZE = 50;
+const GPS_QUEUE_RECOVERY_THRESHOLD = 25;
+const GPS_QUEUE_KEEP_ON_FAILURE = 5;
+const GPS_QUEUE_RECOVERY_KEEP = 10;
+const GPS_STALE_UPLOAD_MS = 2 * 60_000;
+export const GPS_AUTO_RECOVERY_INTERVAL_MS = 90_000;
 const LOCATION_START_TIMEOUT_MS = 20_000;
 
 export type GpsStartOptions = {
@@ -154,6 +159,114 @@ export async function reconcileStaleGpsSendResult(): Promise<void> {
   await AsyncStorage.removeItem(LAST_GPS_RESULT_STORAGE_KEY);
 }
 
+function isFailedUploadResult(result: string | null): boolean {
+  return Boolean(result && result !== 'ok');
+}
+
+function shouldCapQueueGrowth(lastResult: string | null, existingLength: number): boolean {
+  if (existingLength >= GPS_QUEUE_RECOVERY_THRESHOLD) {
+    return true;
+  }
+  if (!lastResult || lastResult === 'ok') {
+    return false;
+  }
+  return (
+    lastResult === 'http_401' ||
+    lastResult === 'http_403' ||
+    lastResult === 'network_error' ||
+    lastResult === 'ECONNABORTED' ||
+    lastResult.startsWith('http_')
+  );
+}
+
+async function recoverOversizedQueue(): Promise<number> {
+  const queued = await readQueuedGpsPayloads();
+  if (queued.length <= GPS_QUEUE_RECOVERY_THRESHOLD) {
+    return 0;
+  }
+  const trimmed = queued.slice(-GPS_QUEUE_RECOVERY_KEEP);
+  await writeQueuedGpsPayloads(trimmed);
+  return queued.length - trimmed.length;
+}
+
+async function uploadLatestQueuedPoint(): Promise<boolean> {
+  const queued = await readQueuedGpsPayloads();
+  if (!queued.length) {
+    return true;
+  }
+  const latest = queued[queued.length - 1];
+  const sent = await submitGpsPayloadBatch([latest]);
+  if (!sent) {
+    return false;
+  }
+  if (queued.length > 1) {
+    await writeQueuedGpsPayloads(queued.slice(-1));
+  }
+  await AsyncStorage.removeItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+  return true;
+}
+
+/**
+ * Automatically repairs stalled GPS uploads: trims stale backlog, refreshes session,
+ * and prioritizes the newest location so live tracking resumes without manual steps.
+ */
+export async function autoRecoverGpsUploads(options?: {
+  aggressive?: boolean;
+  background?: boolean;
+}): Promise<boolean> {
+  await reconcileStaleGpsSendResult();
+
+  const [lastResult, queueDepth, lastSentAt] = await Promise.all([
+    getLastGpsSendResult(),
+    getQueuedGpsPayloadCount(),
+    getLastGpsSentAt(),
+  ]);
+
+  const staleMs = lastSentAt ? Date.now() - new Date(lastSentAt).getTime() : Number.POSITIVE_INFINITY;
+  const needsRecovery =
+    options?.aggressive ||
+    queueDepth > GPS_QUEUE_RECOVERY_THRESHOLD ||
+    isFailedUploadResult(lastResult) ||
+    staleMs > GPS_STALE_UPLOAD_MS;
+
+  if (!needsRecovery && queueDepth === 0) {
+    return true;
+  }
+
+  await pruneGpsQueueToTrackedExecution();
+
+  if (queueDepth > GPS_QUEUE_RECOVERY_THRESHOLD || options?.aggressive) {
+    await recoverOversizedQueue();
+  }
+
+  const shouldRotateSession =
+    lastResult === 'http_401' ||
+    lastResult === 'http_403' ||
+    staleMs > GPS_STALE_UPLOAD_MS ||
+    options?.aggressive;
+
+  if (shouldRotateSession && !options?.background) {
+    await rotateAuthSession();
+  } else if (shouldRotateSession) {
+    await ensureFreshToken({ logoutOnFailure: false });
+  } else {
+    await ensureFreshToken({ logoutOnFailure: false });
+  }
+
+  await renormalizeQueuedGpsPayloads();
+
+  const latestSent = await uploadLatestQueuedPoint();
+  if (!latestSent) {
+    return false;
+  }
+
+  if (options?.background) {
+    return true;
+  }
+
+  return flushQueuedGpsPayloads();
+}
+
 function withGpsTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('location_start_timeout')), ms);
@@ -245,14 +358,14 @@ async function writeQueuedGpsPayloads(payloads: GpsPayload[]): Promise<void> {
 async function appendQueuedGpsPayloads(payloads: GpsPayload[]): Promise<void> {
   if (!payloads.length) return;
 
+  const existing = await readQueuedGpsPayloads();
   const lastResult = await getLastGpsSendResult();
-  if (lastResult === 'http_403' || lastResult === 'http_401') {
-    // Auth is broken — do not grow the offline queue while locked/idle.
-    await writeQueuedGpsPayloads(payloads.slice(-3));
+
+  if (shouldCapQueueGrowth(lastResult, existing.length)) {
+    await writeQueuedGpsPayloads([...existing, ...payloads].slice(-GPS_QUEUE_KEEP_ON_FAILURE));
     return;
   }
 
-  const existing = await readQueuedGpsPayloads();
   await writeQueuedGpsPayloads([...existing, ...payloads]);
 }
 
@@ -353,7 +466,8 @@ async function submitPresenceLocation(
     return true;
   } catch (error) {
     const errorCode = describeGpsSendError(error);
-    if (errorCode === 'http_403' && allowAuthRetry) {
+
+    if ((errorCode === 'http_403' || errorCode === 'http_401') && allowAuthRetry) {
       const rotated = await rotateAuthSession();
       if (rotated) {
         return submitPresenceLocation(location, false);
@@ -387,7 +501,7 @@ async function submitGpsPayloadBatch(payloads: GpsPayload[], allowAuthRetry = tr
   } catch (error) {
     const errorCode = describeGpsSendError(error);
 
-    if (errorCode === 'http_403' && allowAuthRetry) {
+    if ((errorCode === 'http_403' || errorCode === 'http_401') && allowAuthRetry) {
       const rotated = await rotateAuthSession();
       if (rotated) {
         return submitGpsPayloadBatch(payloads, false);
@@ -500,14 +614,21 @@ TaskManager.defineTask(
       if (mode === 'route' && executionId) {
         const payloads = data.locations.map((location) => toGpsPayload(executionId, location));
         await appendQueuedGpsPayloads(payloads);
-        const flushed = await flushQueuedGpsPayloads();
+        let flushed = await flushQueuedGpsPayloads();
+        if (!flushed) {
+          flushed = await autoRecoverGpsUploads({ background: true });
+        }
         if (!flushed) {
           const lastResult = await getLastGpsSendResult();
           await markGpsTaskError(lastResult ?? 'upload_failed');
         }
       } else if (mode === 'presence') {
         const latest = data.locations[data.locations.length - 1];
-        const sent = await submitPresenceLocation(latest);
+        let sent = await submitPresenceLocation(latest);
+        if (!sent) {
+          await rotateAuthSession();
+          sent = await submitPresenceLocation(latest, false);
+        }
         if (!sent) {
           const lastResult = await getLastGpsSendResult();
           await markGpsTaskError(lastResult ?? 'upload_failed');

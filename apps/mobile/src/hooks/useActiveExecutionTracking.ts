@@ -1,13 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { apiClient, ensureFreshToken } from '../services/api';
 import {
   activateTrackedExecution,
+  autoRecoverGpsUploads,
   ensureForegroundLocationStream,
   ensureTrackedExecutionRunning,
-  flushQueuedGpsPayloads,
+  GPS_AUTO_RECOVERY_INTERVAL_MS,
   getGpsTrackingMode,
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
@@ -17,6 +18,7 @@ import {
 } from '../services/gpsService';
 import { flushWorkflowOutbox } from '../services/routeWorkflowService';
 import { useAuthStore } from '../stores/authStore';
+import { useNetworkStatus } from './useNetworkStatus';
 import { useSocketStore } from '../stores/socketStore';
 
 type TodayExecution = {
@@ -30,6 +32,8 @@ const TERMINAL_STATUSES = new Set(['COMPLETED', 'CANCELLED']);
 export function useActiveExecutionTracking() {
   const { isAuthenticated, accessToken } = useAuthStore();
   const socket = useSocketStore((state) => state.socket);
+  const { isOnline } = useNetworkStatus();
+  const wasOfflineRef = useRef(false);
 
   const { data: todayExecutions } = useQuery({
     queryKey: ['today-routes'],
@@ -48,7 +52,7 @@ export function useActiveExecutionTracking() {
     }
 
     const ensureTrackingState = async () => {
-      const tokenValid = await ensureFreshToken();
+      const tokenValid = await ensureFreshToken({ logoutOnFailure: false });
       if (!tokenValid) return;
 
       const trackedExecutionId = await getTrackedExecutionId();
@@ -89,7 +93,6 @@ export function useActiveExecutionTracking() {
         return;
       }
 
-      // No active route — ensure presence GPS is running
       const currentMode = await getGpsTrackingMode();
       if (currentMode !== 'presence') {
         await startPresenceGps({ requestPermissions: false });
@@ -97,33 +100,61 @@ export function useActiveExecutionTracking() {
       await ensureForegroundLocationStream();
     };
 
-    const flushQueue = async () => {
-      await flushQueuedGpsPayloads();
+    const runRecovery = async (options?: { aggressive?: boolean }) => {
+      await autoRecoverGpsUploads(options);
       await flushWorkflowOutbox();
     };
 
     const handleAppStateChange = (nextState: string) => {
       if (nextState === 'active') {
         void ensureTrackingState();
-        void flushQueue();
+        void runRecovery({ aggressive: true });
         return;
       }
 
       if (nextState === 'background' || nextState === 'inactive') {
-        void flushQueue();
+        void runRecovery();
         void ensureForegroundLocationStream();
       }
     };
 
-    void ensureTrackingState();
-    void flushQueue();
+    const onSocketConnect = () => {
+      void runRecovery({ aggressive: true });
+    };
 
-    socket?.on('connect', flushQueue);
+    void ensureTrackingState();
+    void runRecovery();
+
+    socket?.on('connect', onSocketConnect);
+
     const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+    const recoveryInterval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        void runRecovery();
+      }
+    }, GPS_AUTO_RECOVERY_INTERVAL_MS);
 
     return () => {
-      socket?.off('connect', flushQueue);
+      socket?.off('connect', onSocketConnect);
       appStateSubscription.remove();
+      clearInterval(recoveryInterval);
     };
   }, [accessToken, isAuthenticated, socket, todayExecutions]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) {
+      return;
+    }
+
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+      return;
+    }
+
+    if (wasOfflineRef.current) {
+      wasOfflineRef.current = false;
+      void autoRecoverGpsUploads({ aggressive: true });
+      void flushWorkflowOutbox();
+    }
+  }, [accessToken, isAuthenticated, isOnline]);
 }
