@@ -75,5 +75,22 @@
   },
   "pickup": "Pickup",
   "delivery": "Delivery",
-  "both": "Pickup & delivery"
+  "both": "Pickup & delivery",
+  "syncModal": {
+    "title": "Today's route is already completed",
+    "body": "The driver finished today's run. {count} new stops will be sent as a separate route if you create a new execution.",
+    "newStopsTitle": "New stops for the afternoon run",
+    "followUpOptionsTitle": "Afternoon run options",
+    "followUpTime": "Scheduled time",
+    "followUpLabel": "Run label (optional)",
+    "followUpLabelPlaceholder": "e.g. Afternoon run",
+    "keepCompleted": "Keep completed route unchanged",
+    "createFollowUp": "Create new execution for today"
+  },
+  "syncToast": {
+    "syncedOpen": "Route updated. Driver execution synced.",
+    "generated": "Route updated. Today's execution was created for the driver.",
+    "followUpCreated": "Route updated. New afternoon execution created with {count} stops.",
+    "keptCompleted": "Route updated. Template saved for future dates."
+  }
 }

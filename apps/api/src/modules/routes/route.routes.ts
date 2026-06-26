@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { UserRole, createRouteSchema, updateRouteSchema } from '@logx/shared';
+import { UserRole, createRouteSchema, routeEditSyncPreviewSchema, updateRouteSchema } from '@logx/shared';
 
 import { authenticate } from '../../middleware/auth';
 import { requireRole } from '../../middleware/roles';
@@ -13,6 +13,7 @@ import {
   patchRoute,
   patchRouteActive,
   postRoute,
+  postRouteEditSyncPreview,
 } from './route.controller';
 
 const router = Router();
@@ -22,6 +23,12 @@ router.use(authenticate);
 router.get('/', getRoutes);
 router.get('/:id', getSingleRoute);
 router.get('/:id/schedule-preview', getRouteSchedulePreview);
+router.post(
+  '/:id/edit-sync-preview',
+  requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),
+  validateBody(routeEditSyncPreviewSchema),
+  postRouteEditSyncPreview
+);
 router.post(
   '/',
   requireRole(UserRole.ADMIN, UserRole.OPERATOR, UserRole.SUPER_ADMIN),

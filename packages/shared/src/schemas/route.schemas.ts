@@ -101,6 +101,12 @@ export const updateRouteSchemaBase = createRouteSchemaBase
     defaultDriverId: clearableIdSchema.optional(),
     recurrenceStartDate: clearableDateSchema.optional(),
     recurrenceEndDate: clearableDateSchema.optional(),
+    completedTodayAction: z.enum(['keep', 'create_follow_up']).optional(),
+    followUpScheduledTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'validation.timeFormat')
+      .optional(),
+    followUpLabel: z.string().trim().max(100).optional(),
   })
   .partial();
 
@@ -165,6 +171,12 @@ export const reorderStopsSchema = z.object({
   ),
 });
 
+export const routeEditSyncPreviewSchema = z.object({
+  stops: z.array(routeStopSchema).optional(),
+});
+
 export type RouteStopInput = z.infer<typeof routeStopSchema>;
 export type CreateRouteInput = z.infer<typeof createRouteSchema>;
 export type UpdateRouteInput = z.infer<typeof updateRouteSchema>;
+export type RouteEditSyncPreviewInput = z.infer<typeof routeEditSyncPreviewSchema>;
+export type CompletedTodayAction = 'keep' | 'create_follow_up';

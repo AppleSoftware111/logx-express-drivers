@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 import type { UpdateRouteInput } from '@logx/shared';
 
@@ -11,14 +12,29 @@ import {
   RoutePlannerForm,
   routeDetailToFormValues,
 } from '@/components/routes/RoutePlannerForm';
+import {
+  RouteEditSyncModal,
+  type RouteEditSyncPreviewData,
+} from '@/components/routes/RouteEditSyncModal';
 import type { ClientOption } from '@/components/routes/RouteStopsEditor';
 import { apiClient } from '@/lib/api';
 import { useHasAccessToken } from '@/lib/authToken';
 
+type RouteEditSyncResult = {
+  action: 'synced_open' | 'generated' | 'follow_up_created' | 'kept_completed' | 'none';
+  synced: number;
+  generated: number;
+  followUpCreated: number;
+};
+
 export default function EditRoutePlannerPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const sessionReady = useHasAccessToken();
+  const [pendingPayload, setPendingPayload] = useState<UpdateRouteInput | null>(null);
+  const [syncPreview, setSyncPreview] = useState<RouteEditSyncPreviewData | null>(null);
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   const { data: formResources, isLoading: loadingResources } = useQuery({
     queryKey: ['route-form-resources'],
@@ -50,14 +66,80 @@ export default function EditRoutePlannerPage() {
     },
   });
 
+  const redirectAfterSave = useCallback(
+    (sync: RouteEditSyncResult, stopCount?: number) => {
+      void queryClient.invalidateQueries({ queryKey: ['route', id] });
+      void queryClient.invalidateQueries({ queryKey: ['route-schedule', id] });
+      void queryClient.invalidateQueries({ queryKey: ['executions'] });
+      void queryClient.invalidateQueries({ queryKey: ['today-routes'] });
+
+      const params = new URLSearchParams();
+      if (sync.action !== 'none') {
+        params.set('syncAction', sync.action);
+        if (stopCount !== undefined) {
+          params.set('syncStops', String(stopCount));
+        }
+      }
+      const query = params.toString();
+      router.push(`/routes/${id}${query ? `?${query}` : ''}`);
+    },
+    [id, queryClient, router]
+  );
+
   const updateRoute = useMutation({
     mutationFn: async (payload: UpdateRouteInput) => {
-      await apiClient.patch(`/routes/${id}`, payload);
+      const res = await apiClient.patch<{
+        success: boolean;
+        data: { route: unknown; sync: RouteEditSyncResult };
+      }>(`/routes/${id}`, payload);
+      return res.data.data;
     },
-    onSuccess: () => {
-      router.push(`/routes/${id}`);
+    onSuccess: (data) => {
+      setShowSyncModal(false);
+      setPendingPayload(null);
+      setSyncPreview(null);
+      redirectAfterSave(data.sync, syncPreview?.pendingNewStopCount);
     },
   });
+
+  const submitRouteUpdate = useCallback(
+    async (payload: UpdateRouteInput) => {
+      if (payload.stops?.length) {
+        const previewRes = await apiClient.post<{
+          success: boolean;
+          data: RouteEditSyncPreviewData & { needsCompletedTodayPrompt: boolean };
+        }>(`/routes/${id}/edit-sync-preview`, { stops: payload.stops });
+
+        if (previewRes.data.data.needsCompletedTodayPrompt) {
+          setPendingPayload(payload);
+          setSyncPreview(previewRes.data.data);
+          setShowSyncModal(true);
+          return;
+        }
+      }
+
+      updateRoute.mutate(payload);
+    },
+    [id, updateRoute]
+  );
+
+  const handleSyncKeep = () => {
+    if (!pendingPayload) return;
+    updateRoute.mutate({ ...pendingPayload, completedTodayAction: 'keep' });
+  };
+
+  const handleSyncFollowUp = (options: {
+    followUpScheduledTime: string;
+    followUpLabel?: string;
+  }) => {
+    if (!pendingPayload) return;
+    updateRoute.mutate({
+      ...pendingPayload,
+      completedTodayAction: 'create_follow_up',
+      followUpScheduledTime: options.followUpScheduledTime,
+      followUpLabel: options.followUpLabel,
+    });
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -82,10 +164,24 @@ export default function EditRoutePlannerPage() {
           contracts={formResources?.contracts ?? []}
           isSubmitting={updateRoute.isPending}
           submitError={updateRoute.error}
-          onSubmit={(payload) => updateRoute.mutate(payload as UpdateRouteInput)}
+          onSubmit={(payload) => void submitRouteUpdate(payload as UpdateRouteInput)}
           onCancel={() => router.push(`/routes/${id}`)}
         />
       )}
+
+      <RouteEditSyncModal
+        open={showSyncModal}
+        preview={syncPreview}
+        isSubmitting={updateRoute.isPending}
+        onClose={() => {
+          if (updateRoute.isPending) return;
+          setShowSyncModal(false);
+          setPendingPayload(null);
+          setSyncPreview(null);
+        }}
+        onKeepCompleted={handleSyncKeep}
+        onCreateFollowUp={handleSyncFollowUp}
+      />
     </div>
   );
 }

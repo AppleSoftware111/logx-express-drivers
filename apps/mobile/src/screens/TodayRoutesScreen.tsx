@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,8 @@ interface Execution {
   scheduledTime: string;
   status: string;
   delayMinutes: number;
+  runSeq?: number;
+  runLabel?: string;
   routeId: { name: string };
   stops: Array<{ _id: string; status: string; clientId: { name: string } }>;
 }
@@ -57,9 +59,25 @@ export function TodayRoutesScreen({ onSelectExecution, onOpenSettings }: Props) 
     refetchOnMount: 'always',
   });
 
+  const routeNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of data ?? []) {
+      const name = item.routeId?.name ?? '';
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return counts;
+  }, [data]);
+
   const renderItem = ({ item }: { item: Execution }) => {
     const completedStops = item.stops.filter((s) => s.status === 'COMPLETED').length;
     const statusColor = STATUS_COLORS[item.status] ?? '#6b7280';
+    const runSeq = item.runSeq ?? 1;
+    const hasMultipleSameRoute = (routeNameCounts.get(item.routeId?.name ?? '') ?? 0) > 1;
+    const runSubtitle =
+      item.runLabel ??
+      (runSeq > 1 || hasMultipleSameRoute
+        ? t('mobile.runLabel', { run: runSeq, count: item.stops.length })
+        : null);
 
     return (
       <TouchableOpacity
@@ -68,7 +86,10 @@ export function TodayRoutesScreen({ onSelectExecution, onOpenSettings }: Props) 
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.routeName}>{item.routeId?.name}</Text>
+          <View style={styles.titleBlock}>
+            <Text style={styles.routeName}>{item.routeId?.name}</Text>
+            {runSubtitle ? <Text style={styles.runSubtitle}>{runSubtitle}</Text> : null}
+          </View>
           <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
             <Text style={[styles.statusText, { color: statusColor }]}>
               {getExecutionStatusLabel(item.status, locale)}
@@ -203,16 +224,24 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  titleBlock: {
+    flex: 1,
+    marginRight: 8,
   },
   routeName: {
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
-    flex: 1,
-    marginRight: 8,
+  },
+  runSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 10,

@@ -38,5 +38,8 @@
   "POD_FILE_INVALID_TYPE": "El formato de la foto del comprobante no es compatible. Use JPG, PNG o WEBP.",
   "POD_UPLOAD_FAILED": "No se pudo cargar la foto del comprobante. Inténtelo de nuevo.",
   "POD_KEY_REQUIRED": "El parámetro key es obligatorio",
+  "EXECUTION_CANNOT_CREATE_FOLLOW_UP": "No se puede crear una ejecución adicional sin una ejecución completada hoy",
+  "EXECUTION_OPEN_ALREADY_EXISTS": "Ya hay una ejecución abierta hoy. Finalícela o cancélela antes de crear una adicional.",
+  "NO_NEW_STOPS_FOR_FOLLOW_UP": "No hay paradas nuevas para incluir en la ejecución adicional",
   "INTERNAL_ERROR": "Error interno del servidor"
 }

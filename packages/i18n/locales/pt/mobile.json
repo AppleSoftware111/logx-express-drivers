@@ -21,6 +21,7 @@
   "loginFailed": "Falha no login",
   "loadingRoutes": "Carregando rotas…",
   "stopsProgress": "{completed}/{total} paradas",
+  "runLabel": "Execução {run} · {count} paradas",
   "minLate": "{minutes} min de atraso",
   "back": "Voltar",
   "gpsActive": "Rastreamento GPS ativo",

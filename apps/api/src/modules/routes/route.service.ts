@@ -9,6 +9,13 @@ import { Driver } from '../../models/Driver.model';
 import { Route } from '../../models/Route.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
 import {
+  applyRouteEditSync,
+  previewRouteEditSync,
+  type RouteEditSyncOptions,
+  type RouteEditSyncPreview,
+  type RouteEditSyncResult,
+} from '../executions/execution-sync.service';
+import {
   addBusinessDays,
   businessDateStringToUtcDate,
   getCurrentBusinessDateString,
@@ -198,8 +205,15 @@ export async function updateRoute(
   companyId: string,
   routeId: string,
   data: UpdateRouteInput
-) {
-  const draft = data as Partial<CreateRouteInput>;
+): Promise<{ route: Awaited<ReturnType<typeof getRoute>>; sync: RouteEditSyncResult }> {
+  const {
+    completedTodayAction,
+    followUpScheduledTime,
+    followUpLabel,
+    ...routeFields
+  } = data;
+
+  const draft = routeFields as Partial<CreateRouteInput>;
   const currentRoute = await Route.findOne({ companyId, _id: routeId })
     .select('clientId contractId')
     .lean();
@@ -208,7 +222,7 @@ export async function updateRoute(
   const relationState = await validateRouteRelations(companyId, draft, currentRoute);
   const update: Record<string, unknown> = {};
 
-  if ('clientId' in data) {
+  if ('clientId' in routeFields) {
     update.clientId = draft.clientId ?? relationState.derivedClientId ?? null;
   } else if (relationState.derivedClientId) {
     update.clientId = relationState.derivedClientId;
@@ -216,19 +230,19 @@ export async function updateRoute(
   if (draft.name) update.name = draft.name;
   if (draft.description !== undefined) update.description = draft.description;
   if (draft.recurrenceType) update.recurrenceType = draft.recurrenceType;
-  if ('daysOfWeek' in data) update.daysOfWeek = draft.daysOfWeek ?? [];
-  if ('dayOfMonth' in data) update.dayOfMonth = draft.dayOfMonth ?? null;
-  if ('monthOfYear' in data) update.monthOfYear = draft.monthOfYear ?? null;
-  if ('recurrenceStartDate' in data) {
+  if ('daysOfWeek' in routeFields) update.daysOfWeek = draft.daysOfWeek ?? [];
+  if ('dayOfMonth' in routeFields) update.dayOfMonth = draft.dayOfMonth ?? null;
+  if ('monthOfYear' in routeFields) update.monthOfYear = draft.monthOfYear ?? null;
+  if ('recurrenceStartDate' in routeFields) {
     update.recurrenceStartDate = normalizeOptionalDate(draft.recurrenceStartDate) ?? null;
   }
-  if ('recurrenceEndDate' in data) {
+  if ('recurrenceEndDate' in routeFields) {
     update.recurrenceEndDate = normalizeOptionalDate(draft.recurrenceEndDate) ?? null;
   }
   if (draft.scheduledTime) update.scheduledTime = draft.scheduledTime;
   if (draft.isTemplate !== undefined) update.isTemplate = draft.isTemplate;
-  if ('defaultDriverId' in data) update.defaultDriverId = draft.defaultDriverId ?? null;
-  if ('contractId' in data) update.contractId = draft.contractId ?? null;
+  if ('defaultDriverId' in routeFields) update.defaultDriverId = draft.defaultDriverId ?? null;
+  if ('contractId' in routeFields) update.contractId = draft.contractId ?? null;
   if (draft.stops) {
     update.stops = draft.stops.map((s, i) => ({
       clientId: s.clientId,
@@ -259,7 +273,24 @@ export async function updateRoute(
     { $set: update },
     { new: true }
   ).lean();
-  return route!;
+  if (!route) throw new AppError(ApiErrorCode.ROUTE_NOT_FOUND, 404);
+
+  const syncOptions: RouteEditSyncOptions = {
+    completedTodayAction,
+    followUpScheduledTime,
+    followUpLabel,
+  };
+  const sync = await applyRouteEditSync(companyId, routeId, syncOptions);
+
+  return { route, sync };
+}
+
+export async function getRouteEditSyncPreview(
+  companyId: string,
+  routeId: string,
+  proposedStops?: UpdateRouteInput['stops']
+): Promise<RouteEditSyncPreview> {
+  return previewRouteEditSync(companyId, routeId, proposedStops);
 }
 
 export async function toggleRouteActive(companyId: string, routeId: string, isActive: boolean) {

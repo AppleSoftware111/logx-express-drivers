@@ -38,5 +38,8 @@
   "POD_FILE_INVALID_TYPE": "O formato da foto do comprovante não é suportado. Use JPG, PNG ou WEBP.",
   "POD_UPLOAD_FAILED": "Não foi possível enviar a foto do comprovante. Tente novamente.",
   "POD_KEY_REQUIRED": "Parâmetro key é obrigatório",
+  "EXECUTION_CANNOT_CREATE_FOLLOW_UP": "Não é possível criar uma nova execução sem uma execução concluída hoje",
+  "EXECUTION_OPEN_ALREADY_EXISTS": "Já existe uma execução em aberto hoje. Conclua ou cancele antes de criar uma nova execução.",
+  "NO_NEW_STOPS_FOR_FOLLOW_UP": "Não há novas paradas para incluir na nova execução",
   "INTERNAL_ERROR": "Erro interno do servidor"
 }

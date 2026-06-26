@@ -21,6 +21,7 @@
   "loginFailed": "Login failed",
   "loadingRoutes": "Loading routes…",
   "stopsProgress": "{completed}/{total} stops",
+  "runLabel": "Run {run} · {count} stops",
   "minLate": "{minutes} min late",
   "back": "Back",
   "gpsActive": "GPS tracking active",

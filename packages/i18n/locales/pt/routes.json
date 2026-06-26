@@ -75,5 +75,22 @@
   },
   "pickup": "Coleta",
   "delivery": "Entrega",
-  "both": "Coleta e entrega"
+  "both": "Coleta e entrega",
+  "syncModal": {
+    "title": "A rota de hoje já foi concluída",
+    "body": "O motorista já finalizou a execução de hoje. {count} novas paradas serão enviadas como uma rota separada se você criar uma nova execução.",
+    "newStopsTitle": "Novas paradas para a execução da tarde",
+    "followUpOptionsTitle": "Opções da execução da tarde",
+    "followUpTime": "Horário programado",
+    "followUpLabel": "Rótulo da execução (opcional)",
+    "followUpLabelPlaceholder": "ex.: Execução da tarde",
+    "keepCompleted": "Manter execução concluída sem alterações",
+    "createFollowUp": "Criar nova execução para hoje"
+  },
+  "syncToast": {
+    "syncedOpen": "Rota atualizada. Execução do motorista sincronizada.",
+    "generated": "Rota atualizada. Execução de hoje criada para o motorista.",
+    "followUpCreated": "Rota atualizada. Nova execução da tarde criada com {count} paradas.",
+    "keptCompleted": "Rota atualizada. Modelo salvo para datas futuras."
+  }
 }

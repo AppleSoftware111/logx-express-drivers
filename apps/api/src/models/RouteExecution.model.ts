@@ -35,6 +35,9 @@ export interface IRouteExecution extends Document {
   contractId?: Types.ObjectId;
   scheduledDate: Date;
   scheduledTime: string;
+  runSeq: number;
+  runLabel?: string;
+  sourceExecutionId?: Types.ObjectId;
   driverId: Types.ObjectId;
   originalDriverId: Types.ObjectId;
   isSubstitution: boolean;
@@ -103,6 +106,9 @@ const routeExecutionSchema = new Schema<IRouteExecution>(
     contractId: { type: Schema.Types.ObjectId, ref: 'Contract' },
     scheduledDate: { type: Date, required: true },
     scheduledTime: { type: String, required: true },
+    runSeq: { type: Number, required: true, default: 1, min: 1 },
+    runLabel: { type: String, trim: true, maxlength: 100 },
+    sourceExecutionId: { type: Schema.Types.ObjectId, ref: 'RouteExecution', default: null },
     driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
     originalDriverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
     isSubstitution: { type: Boolean, default: false },
@@ -123,8 +129,8 @@ const routeExecutionSchema = new Schema<IRouteExecution>(
   }
 );
 
-// Compound unique index: prevents duplicate execution for the same route + date
-routeExecutionSchema.index({ routeId: 1, scheduledDate: 1 }, { unique: true });
+// One execution per route + date + run (supports afternoon follow-up runs)
+routeExecutionSchema.index({ routeId: 1, scheduledDate: 1, runSeq: 1 }, { unique: true });
 routeExecutionSchema.index({ companyId: 1, scheduledDate: 1 });
 routeExecutionSchema.index({ driverId: 1, scheduledDate: 1 });
 routeExecutionSchema.index({ status: 1 });

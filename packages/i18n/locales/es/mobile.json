@@ -21,6 +21,7 @@
   "loginFailed": "Error de inicio de sesión",
   "loadingRoutes": "Cargando rutas…",
   "stopsProgress": "{completed}/{total} paradas",
+  "runLabel": "Ejecución {run} · {count} paradas",
   "minLate": "{minutes} min de retraso",
   "back": "Volver",
   "gpsActive": "Seguimiento GPS activo",

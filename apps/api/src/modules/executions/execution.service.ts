@@ -287,7 +287,7 @@ export async function getTodayExecutions(companyId: string, driverId?: string) {
     .populate('driverId', 'name phone vehicleId isOnline currentLocation')
     .populate('stops.clientId', 'name address location type')
     .lean()
-    .sort({ scheduledTime: 1 });
+    .sort({ scheduledTime: 1, runSeq: 1 });
 
   // Also include any IN_PROGRESS execution from a previous day so a driver
   // who started a route yesterday (or earlier) is still tracked after a login.
@@ -1027,6 +1027,7 @@ export async function generateExecutionForDate(routeId: string, targetDate: Date
   const existingExecution = await RouteExecution.findOne({
     routeId: route._id,
     scheduledDate,
+    runSeq: 1,
   })
     .select('_id')
     .lean();
@@ -1038,6 +1039,7 @@ export async function generateExecutionForDate(routeId: string, targetDate: Date
     contractId: route.contractId,
     scheduledDate,
     scheduledTime: route.scheduledTime,
+    runSeq: 1,
     driverId: route.defaultDriverId,
     originalDriverId: route.defaultDriverId,
     isSubstitution: false,
@@ -1058,7 +1060,7 @@ export async function generateExecutionForDate(routeId: string, targetDate: Date
   };
 
   const execution = await RouteExecution.findOneAndUpdate(
-    { routeId: route._id, scheduledDate },
+    { routeId: route._id, scheduledDate, runSeq: 1 },
     { $setOnInsert: executionData },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );

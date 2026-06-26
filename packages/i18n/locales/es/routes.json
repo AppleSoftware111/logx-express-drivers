@@ -75,5 +75,22 @@
   },
   "pickup": "Recogida",
   "delivery": "Entrega",
-  "both": "Recogida y entrega"
+  "both": "Recogida y entrega",
+  "syncModal": {
+    "title": "La ruta de hoy ya está completada",
+    "body": "El conductor ya finalizó la ejecución de hoy. {count} paradas nuevas se enviarán como una ruta separada si crea una nueva ejecución.",
+    "newStopsTitle": "Paradas nuevas para la ejecución de la tarde",
+    "followUpOptionsTitle": "Opciones de la ejecución de la tarde",
+    "followUpTime": "Hora programada",
+    "followUpLabel": "Etiqueta de ejecución (opcional)",
+    "followUpLabelPlaceholder": "ej.: Ejecución de la tarde",
+    "keepCompleted": "Mantener la ejecución completada sin cambios",
+    "createFollowUp": "Crear nueva ejecución para hoy"
+  },
+  "syncToast": {
+    "syncedOpen": "Ruta actualizada. Ejecución del conductor sincronizada.",
+    "generated": "Ruta actualizada. Se creó la ejecución de hoy para el conductor.",
+    "followUpCreated": "Ruta actualizada. Nueva ejecución de la tarde creada con {count} paradas.",
+    "keptCompleted": "Ruta actualizada. Plantilla guardada para fechas futuras."
+  }
 }

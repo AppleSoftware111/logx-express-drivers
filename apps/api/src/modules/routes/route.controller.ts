@@ -6,6 +6,7 @@ import {
   createRoute,
   deleteRoute,
   getRoute,
+  getRouteEditSyncPreview,
   listRoutes,
   previewRouteSchedule,
   toggleRouteActive,
@@ -45,8 +46,17 @@ export const postRoute = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const patchRoute = asyncHandler(async (req: Request, res: Response) => {
-  const route = await updateRoute(req.user!.companyId, req.params.id, req.body);
-  return sendSuccess(res, route);
+  const { route, sync } = await updateRoute(req.user!.companyId, req.params.id, req.body);
+  return sendSuccess(res, { route, sync });
+});
+
+export const postRouteEditSyncPreview = asyncHandler(async (req: Request, res: Response) => {
+  const preview = await getRouteEditSyncPreview(
+    req.user!.companyId,
+    req.params.id,
+    req.body.stops
+  );
+  return sendSuccess(res, preview);
 });
 
 export const patchRouteActive = asyncHandler(async (req: Request, res: Response) => {

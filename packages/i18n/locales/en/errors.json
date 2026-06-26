@@ -38,5 +38,8 @@
   "POD_FILE_INVALID_TYPE": "The proof photo format is not supported. Use JPG, PNG, or WEBP.",
   "POD_UPLOAD_FAILED": "The proof photo could not be uploaded. Please try again.",
   "POD_KEY_REQUIRED": "key query parameter is required",
+  "EXECUTION_CANNOT_CREATE_FOLLOW_UP": "Cannot create a follow-up run without a completed execution today",
+  "EXECUTION_OPEN_ALREADY_EXISTS": "An open execution already exists for today. Finish or cancel it before creating a follow-up run.",
+  "NO_NEW_STOPS_FOR_FOLLOW_UP": "No new stops to include in a follow-up run",
   "INTERNAL_ERROR": "Internal server error"
 }

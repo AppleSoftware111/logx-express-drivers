@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useLocale, useTranslations } from 'next-intl';
@@ -53,6 +53,9 @@ function formatRecurrence(route: {
 
 export default function RouteDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const syncAction = searchParams.get('syncAction');
+  const syncStops = searchParams.get('syncStops');
   const t = useTranslations('routes');
   const tCommon = useTranslations('common');
   const locale = useLocale() as SupportedLocale;
@@ -143,8 +146,24 @@ export default function RouteDetailPage() {
       })
     );
 
+  const syncToastMessage =
+    syncAction === 'synced_open'
+      ? t('syncToast.syncedOpen')
+      : syncAction === 'generated'
+        ? t('syncToast.generated')
+        : syncAction === 'follow_up_created'
+          ? t('syncToast.followUpCreated', { count: Number(syncStops) || 0 })
+          : syncAction === 'kept_completed'
+            ? t('syncToast.keptCompleted')
+            : null;
+
   return (
     <div className="max-w-7xl space-y-6 p-6">
+      {syncToastMessage && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+          {syncToastMessage}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/routes" className="rounded-lg p-2 transition-colors hover:bg-gray-100">
