@@ -373,6 +373,38 @@ Use `forceRefreshAuthSession()` on Settings Refresh to pick up new JWT claims af
 | 1.0.3 | Background upload timeout, dual path tracking |
 | 1.0.4 | Sanitize GPS metrics, queue renormalize |
 | 1.0.5 | Fix hidden 403, force token refresh, Driver ID in token, clear queue |
+| 1.0.9 | Sequential geofence (API), background GPS recovery every 2 min, stale upload banner |
+
+---
+
+## Client field verification (Test Mateus / production)
+
+Run after deploying **API + web + mobile 1.0.9+**.
+
+### DB migration (route afternoon runs)
+
+```bash
+npm run migrate-execution-run-seq --workspace=@logx/api
+```
+
+### Geofence (false auto-arrival fix)
+
+1. Driver starts Stop 1 (On the way) — Stops 2–4 must stay Pending/unchanged.
+2. Enter Stop 1 geofence — only Stop 1 becomes Arrived.
+3. Admin execution detail shows **Auto-arrived (GPS geofence)** with distance in meters.
+
+### Background GPS
+
+1. Start route → lock screen 5+ minutes.
+2. Admin live map updates without opening the app.
+3. Settings → Refresh: **Last background GPS event** and **Last location sent** show recent times; **Last upload result: Success**.
+
+### Route edit → afternoon execution
+
+1. Driver completes morning run.
+2. Admin edits route via **`/routes/:id/edit`** (not dialog-only), adds stops, saves.
+3. Modal → **Create new execution for today**.
+4. Driver app shows second execution (run label) with new stops only; morning run unchanged.
 
 ---
 

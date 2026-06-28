@@ -25,6 +25,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import {
   ensureGpsReadyForRouteStart,
   ensureTrackedExecutionRunning,
+  getGpsUploadHealth,
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
   stopBackgroundGps,
@@ -117,6 +118,37 @@ export function RouteDetailScreen({ executionId, onBack, onComplete }: Props) {
 
     return () => clearInterval(interval);
   }, [executionId, execution?.status]);
+
+  useEffect(() => {
+    if (execution?.status !== 'IN_PROGRESS') {
+      setGpsWarning(null);
+      return;
+    }
+
+    const checkUploadHealth = async () => {
+      const health = await getGpsUploadHealth();
+      if (!health.backgroundRunning) {
+        setGpsWarning(t('mobile.backgroundGpsNotRunning'));
+        return;
+      }
+      if (
+        health.stale ||
+        (health.lastResult && health.lastResult !== 'ok') ||
+        health.queueDepth > 10
+      ) {
+        setGpsWarning(t('mobile.gpsUploadStale'));
+        return;
+      }
+      setGpsWarning(null);
+    };
+
+    void checkUploadHealth();
+    const interval = setInterval(() => {
+      void checkUploadHealth();
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [execution?.status, t]);
 
   useEffect(() => {
     if (['COMPLETED', 'CANCELLED'].includes(execution?.status ?? '')) {

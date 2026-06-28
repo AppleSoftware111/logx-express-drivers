@@ -9,6 +9,7 @@ import {
   ensureForegroundLocationStream,
   ensureTrackedExecutionRunning,
   GPS_AUTO_RECOVERY_INTERVAL_MS,
+  GPS_BACKGROUND_RECOVERY_INTERVAL_MS,
   getGpsTrackingMode,
   getTrackedExecutionId,
   hasBackgroundGpsStarted,
@@ -100,9 +101,19 @@ export function useActiveExecutionTracking() {
       await ensureForegroundLocationStream();
     };
 
-    const runRecovery = async (options?: { aggressive?: boolean }) => {
+    const runRecovery = async (options?: { aggressive?: boolean; background?: boolean }) => {
       await autoRecoverGpsUploads(options);
       await flushWorkflowOutbox();
+    };
+
+    const ensureBackgroundTaskRunning = async () => {
+      const trackedExecutionId = await getTrackedExecutionId();
+      if (!trackedExecutionId) return;
+
+      const isRunning = await hasBackgroundGpsStarted();
+      if (!isRunning) {
+        await ensureTrackedExecutionRunning(trackedExecutionId, { requestPermissions: false });
+      }
     };
 
     const handleAppStateChange = (nextState: string) => {
@@ -113,8 +124,11 @@ export function useActiveExecutionTracking() {
       }
 
       if (nextState === 'background' || nextState === 'inactive') {
-        void runRecovery();
-        void ensureForegroundLocationStream();
+        void (async () => {
+          await ensureBackgroundTaskRunning();
+          await runRecovery({ background: true });
+          await ensureForegroundLocationStream();
+        })();
       }
     };
 
@@ -128,16 +142,23 @@ export function useActiveExecutionTracking() {
     socket?.on('connect', onSocketConnect);
 
     const appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
-    const recoveryInterval = setInterval(() => {
+    const activeRecoveryInterval = setInterval(() => {
       if (AppState.currentState === 'active') {
         void runRecovery();
       }
     }, GPS_AUTO_RECOVERY_INTERVAL_MS);
+    const backgroundRecoveryInterval = setInterval(() => {
+      if (AppState.currentState !== 'active') {
+        void ensureBackgroundTaskRunning();
+        void runRecovery({ background: true });
+      }
+    }, GPS_BACKGROUND_RECOVERY_INTERVAL_MS);
 
     return () => {
       socket?.off('connect', onSocketConnect);
       appStateSubscription.remove();
-      clearInterval(recoveryInterval);
+      clearInterval(activeRecoveryInterval);
+      clearInterval(backgroundRecoveryInterval);
     };
   }, [accessToken, isAuthenticated, socket, todayExecutions]);
 

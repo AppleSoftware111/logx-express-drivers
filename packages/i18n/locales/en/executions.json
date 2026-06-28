@@ -35,6 +35,10 @@
   "capturedAddress": "Captured address",
   "gpsCoordinates": "GPS coordinates",
   "distanceToStop": "Distance to stop",
+  "arrivalSourceGeofence": "Auto-arrived (GPS geofence)",
+  "arrivalSourceManual": "Marked arrived by driver",
+  "arrivalSourceOffline": "Synced from offline action",
+  "arrivalSourceAdmin": "Updated by admin",
   "replayGps": "Replay GPS",
   "pause": "Pause"
 }

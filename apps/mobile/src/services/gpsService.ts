@@ -25,7 +25,8 @@ const GPS_BATCH_SIZE = 50;
 const GPS_QUEUE_RECOVERY_THRESHOLD = 25;
 const GPS_QUEUE_KEEP_ON_FAILURE = 5;
 const GPS_QUEUE_RECOVERY_KEEP = 10;
-const GPS_STALE_UPLOAD_MS = 2 * 60_000;
+export const GPS_STALE_UPLOAD_MS = 2 * 60_000;
+export const GPS_BACKGROUND_RECOVERY_INTERVAL_MS = 120_000;
 export const GPS_AUTO_RECOVERY_INTERVAL_MS = 90_000;
 const LOCATION_START_TIMEOUT_MS = 20_000;
 
@@ -112,6 +113,37 @@ export async function getLastGpsTaskFiredAt(): Promise<string | null> {
 
 export async function getLastGpsTaskError(): Promise<string | null> {
   return AsyncStorage.getItem(LAST_GPS_TASK_ERROR_STORAGE_KEY);
+}
+
+export async function isGpsUploadStale(): Promise<boolean> {
+  const [lastSentAt, mode] = await Promise.all([getLastGpsSentAt(), getGpsTrackingMode()]);
+  if (mode === 'off') return false;
+  if (!lastSentAt) return true;
+  return Date.now() - new Date(lastSentAt).getTime() > GPS_STALE_UPLOAD_MS;
+}
+
+export async function getGpsUploadHealth(): Promise<{
+  stale: boolean;
+  lastResult: string | null;
+  queueDepth: number;
+  taskFiredAt: string | null;
+  backgroundRunning: boolean;
+}> {
+  const [stale, lastResult, queueDepth, taskFiredAt, backgroundRunning] = await Promise.all([
+    isGpsUploadStale(),
+    getLastGpsSendResult(),
+    getQueuedGpsPayloadCount(),
+    getLastGpsTaskFiredAt(),
+    hasBackgroundGpsStarted(),
+  ]);
+
+  return {
+    stale,
+    lastResult,
+    queueDepth,
+    taskFiredAt,
+    backgroundRunning,
+  };
 }
 
 export async function getQueuedGpsPayloadCount(): Promise<number> {
@@ -261,6 +293,12 @@ export async function autoRecoverGpsUploads(options?: {
   }
 
   if (options?.background) {
+    await ensureFreshToken({ logoutOnFailure: false });
+    await renormalizeQueuedGpsPayloads();
+    const latestSent = await uploadLatestQueuedPoint();
+    if (!latestSent) {
+      return false;
+    }
     return true;
   }
 

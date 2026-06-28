@@ -1,8 +1,5 @@
 import type { GpsPointInput } from '@logx/shared';
-import {
-  DRIVER_LOCATION_STALE_WINDOW_MS,
-  GEOFENCE_RADIUS_METERS,
-} from '@logx/shared';
+import { DRIVER_LOCATION_STALE_WINDOW_MS } from '@logx/shared';
 
 import { Client } from '../../models/Client.model';
 import { Driver } from '../../models/Driver.model';
@@ -10,7 +7,10 @@ import { GpsPoint } from '../../models/GpsPoint.model';
 import { RouteExecution } from '../../models/RouteExecution.model';
 import { RouteExecutionAudit } from '../../models/RouteExecutionAudit.model';
 import { syncExecutionLifecycle, touchDashboard } from '../executions/execution.service';
-import { haversineDistance, isWithinRadius } from '../../utils/haversine';
+import {
+  findGeofenceEligibleStop,
+  shouldTriggerGeofenceArrival,
+} from './geofence.service';
 
 interface BufferedGpsPoint extends GpsPointInput {
   companyId: string;
@@ -86,19 +86,22 @@ export async function processDriverGpsPayload(
 
   await updateDriverLocation(driverId, payload.lat, payload.lng);
 
-  return checkGeofenceArrivals(payload.executionId, companyId, payload.lat, payload.lng);
+  return checkGeofenceArrivals(payload.executionId, companyId, {
+    lat: payload.lat,
+    lng: payload.lng,
+    accuracy: payload.accuracy,
+    speed: payload.speed,
+  });
 }
 
 /**
- * Check if the driver is within GEOFENCE_RADIUS_METERS of any pending stops.
- * If so, auto-set the stop to ARRIVED.
- * Returns the executionId and stopId if triggered, otherwise null.
+ * Auto-arrive only the current stop in route order when GPS is within geofence
+ * and accuracy/speed guards pass.
  */
 export async function checkGeofenceArrivals(
   executionId: string,
   companyId: string,
-  lat: number,
-  lng: number
+  sample: { lat: number; lng: number; accuracy?: number; speed?: number }
 ): Promise<{ executionId: string; stopId: string; clientName: string } | null> {
   const execution = await RouteExecution.findOne({ _id: executionId, companyId })
     .populate('stops.clientId', 'name location')
@@ -108,66 +111,61 @@ export async function checkGeofenceArrivals(
     return null;
   }
 
-  for (const stop of execution.stops) {
-    if (!['PENDING', 'ON_THE_WAY'].includes(stop.status)) continue;
+  const eligibleStop = findGeofenceEligibleStop(execution.stops);
+  if (!eligibleStop) return null;
 
-    const targetLat = stop.location.lat;
-    const targetLng = stop.location.lng;
+  const { trigger, distanceMeters } = shouldTriggerGeofenceArrival(eligibleStop, sample);
+  if (!trigger) return null;
 
-    if (isWithinRadius(lat, lng, targetLat, targetLng, GEOFENCE_RADIUS_METERS)) {
-      stop.status = 'ARRIVED';
-      stop.arrivedAt = new Date();
-      stop.arrivalLocation = { lat, lng };
-      stop.arrivalDistanceMeters = Math.round(
-        haversineDistance(lat, lng, targetLat, targetLng)
-      );
+  const targetLat = eligibleStop.location.lat;
+  const targetLng = eligibleStop.location.lng;
 
-      // Auto-progress execution to IN_PROGRESS on first arrival
-      if (execution.status === 'ASSIGNED' || execution.status === 'ACCEPTED') {
-        execution.status = 'IN_PROGRESS';
-        if (!execution.actualStartTime) {
-          execution.actualStartTime = new Date();
-        }
-      }
+  eligibleStop.status = 'ARRIVED';
+  eligibleStop.arrivedAt = new Date();
+  eligibleStop.arrivalLocation = { lat: sample.lat, lng: sample.lng };
+  eligibleStop.arrivalDistanceMeters = distanceMeters;
 
-      syncExecutionLifecycle(execution);
-      await execution.save();
-      await RouteExecutionAudit.create({
-        companyId,
-        routeId: execution.routeId,
-        executionId: execution._id,
-        stopId: stop._id,
-        action: 'STOP_ARRIVED',
-        driverId: execution.driverId,
-        clientEventId: `geofence:${execution._id}:${stop._id}:${stop.arrivedAt.toISOString()}`,
-        occurredAt: stop.arrivedAt,
-        serverReceivedAt: new Date(),
-        source: 'geofence',
-        gps: {
-          lat,
-          lng,
-          recordedAt: stop.arrivedAt,
-        },
-        expectedLocation: {
-          lat: targetLat,
-          lng: targetLng,
-        },
-        distanceMeters: stop.arrivalDistanceMeters,
-      });
-      touchDashboard(companyId);
-
-      // Get the client name from populated data
-      const client = await Client.findById(stop.clientId).select('name').lean();
-
-      return {
-        executionId: execution._id.toString(),
-        stopId: stop._id.toString(),
-        clientName: client?.name ?? 'Unknown',
-      };
+  if (execution.status === 'ASSIGNED' || execution.status === 'ACCEPTED') {
+    execution.status = 'IN_PROGRESS';
+    if (!execution.actualStartTime) {
+      execution.actualStartTime = new Date();
     }
   }
 
-  return null;
+  syncExecutionLifecycle(execution);
+  await execution.save();
+  await RouteExecutionAudit.create({
+    companyId,
+    routeId: execution.routeId,
+    executionId: execution._id,
+    stopId: eligibleStop._id,
+    action: 'STOP_ARRIVED',
+    driverId: execution.driverId,
+    clientEventId: `geofence:${execution._id}:${eligibleStop._id}:${eligibleStop.arrivedAt.toISOString()}`,
+    occurredAt: eligibleStop.arrivedAt,
+    serverReceivedAt: new Date(),
+    source: 'geofence',
+    gps: {
+      lat: sample.lat,
+      lng: sample.lng,
+      accuracy: sample.accuracy,
+      recordedAt: eligibleStop.arrivedAt,
+    },
+    expectedLocation: {
+      lat: targetLat,
+      lng: targetLng,
+    },
+    distanceMeters: eligibleStop.arrivalDistanceMeters,
+  });
+  touchDashboard(companyId);
+
+  const client = await Client.findById(eligibleStop.clientId).select('name').lean();
+
+  return {
+    executionId: execution._id.toString(),
+    stopId: eligibleStop._id.toString(),
+    clientName: client?.name ?? 'Unknown',
+  };
 }
 
 export async function getOnlineDrivers(companyId: string) {

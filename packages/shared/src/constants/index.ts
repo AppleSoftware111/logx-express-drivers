@@ -1,4 +1,6 @@
-export const GEOFENCE_RADIUS_METERS = 100;
+export const GEOFENCE_RADIUS_METERS = 75;
+export const GEOFENCE_MIN_ACCURACY_METERS = 50;
+export const GEOFENCE_MAX_SPEED_MPS = 5;
 
 export const GPS_BUFFER_FLUSH_INTERVAL_MS = 30_000;
 

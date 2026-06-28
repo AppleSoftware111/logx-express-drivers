@@ -542,6 +542,9 @@ export function SettingsScreen({ onClose }: Props) {
         {diagnosticErrorLabel ? (
           <Text style={styles.diagnosticErrorText}>{diagnosticErrorLabel}</Text>
         ) : null}
+        {trackingMode !== 'off' && !lastGpsTaskFiredAt && !lastGpsSentAt ? (
+          <Text style={styles.diagnosticErrorText}>{t('mobile.backgroundGpsNotRunning')}</Text>
+        ) : null}
         <Text style={styles.helperText}>{t('mobile.trackingDiagnosticsHint')}</Text>
         {gpsQueueDepth > 0 ? (
           <TouchableOpacity

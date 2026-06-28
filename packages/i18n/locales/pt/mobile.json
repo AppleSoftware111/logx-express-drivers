@@ -26,6 +26,8 @@
   "back": "Voltar",
   "gpsActive": "Rastreamento GPS ativo",
   "gpsNotRunning": "GPS não está enviando — abra Configurações e toque em Atualizar",
+  "gpsUploadStale": "A localização não está atualizando em segundo plano. Abra Configurações, toque em Atualizar e desative a otimização de bateria para este app.",
+  "backgroundGpsNotRunning": "A tarefa de GPS em segundo plano não está ativa. Conceda localização (Sempre), notificações e desative a otimização de bateria, depois toque em Atualizar.",
   "proofOfDelivery": "Comprovante de entrega",
   "captureReceiverInfo": "Capture a foto e as informações do recebedor",
   "retakePhoto": "Refazer foto",

@@ -161,6 +161,7 @@ function getStopLocationProof(
       location: stop.arrivalLocation ?? audit?.gps,
       address: stop.arrivalAddress ?? audit?.resolvedAddress,
       distanceMeters: stop.arrivalDistanceMeters ?? audit?.distanceMeters,
+      source: audit?.source,
     };
   }
 
@@ -169,7 +170,16 @@ function getStopLocationProof(
     location: stop.deliveryLocation ?? audit?.gps,
     address: stop.collectionAddress ?? audit?.resolvedAddress,
     distanceMeters: stop.collectionDistanceMeters ?? audit?.distanceMeters,
+    source: audit?.source,
   };
+}
+
+function getArrivalSourceLabel(source: string | undefined, t: (key: string) => string) {
+  if (source === 'geofence') return t('arrivalSourceGeofence');
+  if (source === 'mobile_offline_sync') return t('arrivalSourceOffline');
+  if (source === 'admin') return t('arrivalSourceAdmin');
+  if (source === 'mobile_online') return t('arrivalSourceManual');
+  return null;
 }
 
 function ExecutionMapAutoFit({
@@ -513,6 +523,11 @@ export default function ExecutionDetailPage() {
                           {arrivedDistance && (
                             <p className="mt-1 text-cyan-800">
                               {t('distanceToStop')}: {arrivedDistance}
+                            </p>
+                          )}
+                          {getArrivalSourceLabel(arrivedProof.source, t) && (
+                            <p className="mt-1 font-medium text-cyan-900">
+                              {getArrivalSourceLabel(arrivedProof.source, t)}
                             </p>
                           )}
                         </div>

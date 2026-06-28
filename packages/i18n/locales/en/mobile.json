@@ -26,6 +26,8 @@
   "back": "Back",
   "gpsActive": "GPS tracking active",
   "gpsNotRunning": "GPS not sending — open Settings and tap Refresh",
+  "gpsUploadStale": "Location not updating in the background. Open Settings, tap Refresh, and disable battery optimization for this app.",
+  "backgroundGpsNotRunning": "Background GPS task is not running. Grant location (Always), notifications, and disable battery optimization, then tap Refresh.",
   "proofOfDelivery": "Proof of delivery",
   "captureReceiverInfo": "Capture photo and receiver information",
   "retakePhoto": "Retake photo",

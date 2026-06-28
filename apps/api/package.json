@@ -13,7 +13,8 @@
     "seed": "ts-node --transpile-only src/scripts/seed.ts",
     "repair-driver-links": "ts-node --transpile-only src/scripts/repair-driver-links.ts",
     "migrate-execution-run-seq": "ts-node --transpile-only src/scripts/migrate-execution-run-seq.ts",
-    "test": "tsc && node dist/scripts/test-execution-sync.js"
+    "test": "tsc && node dist/scripts/test-execution-sync.js && node dist/scripts/test-geofence.js",
+    "test:geofence": "tsc && node dist/scripts/test-geofence.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

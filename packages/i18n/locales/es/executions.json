@@ -35,6 +35,10 @@
   "capturedAddress": "Dirección capturada",
   "gpsCoordinates": "Coordenadas GPS",
   "distanceToStop": "Distancia hasta la parada",
+  "arrivalSourceGeofence": "Llegada automática (geocerca GPS)",
+  "arrivalSourceManual": "Marcada como llegó por el conductor",
+  "arrivalSourceOffline": "Sincronizada sin conexión",
+  "arrivalSourceAdmin": "Actualizada por el admin",
   "replayGps": "Reproducir GPS",
   "pause": "Pausar"
 }
